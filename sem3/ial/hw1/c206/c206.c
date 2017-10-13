@@ -75,9 +75,11 @@ void DLInitList (tDLList *L) {
 ** seznamem, a proto tuto možnost neošetřujte. Vždy předpokládejte,
 ** že neinicializované proměnné mají nedefinovanou hodnotu.
 **/
-    
+	L->First = NULL;
+	L->Last = NULL;
+	L->Act = NULL;
 	
- solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
+ 	//solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
 
 void DLDisposeList (tDLList *L) {
@@ -86,9 +88,14 @@ void DLDisposeList (tDLList *L) {
 ** se nacházel po inicializaci. Rušené prvky seznamu budou korektně
 ** uvolněny voláním operace free. 
 **/
+	tDLElemPtr ptr = L->First; 
+
+	while (ptr != NULL) {
+		ptr = ptr->rptr;
+		free(ptr->lptr);
+	}
 	
-	
- solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
+ 	//solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
 
 void DLInsertFirst (tDLList *L, int val) {
@@ -97,9 +104,28 @@ void DLInsertFirst (tDLList *L, int val) {
 ** V případě, že není dostatek paměti pro nový prvek při operaci malloc,
 ** volá funkci DLError().
 **/
+	tDLElemPtr* ptr = malloc (sizeof(tDLElemPtr));
+
+	if (ptr != NULL) {
+		ptr.data = val;
+		ptr.lptr = NULL;
+		ptr.rptr = L.First;
+	}
+	else {
+		DLError();
+		return;
+	}
+
+	if (L.First != NULL) {
+		L.First.lptr = ptr;
+	}
+	else {
+		L.Last = ptr;
+	}
+
+	L.First = ptr;
 	
-	
- solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
+ 	//solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
 
 void DLInsertLast(tDLList *L, int val) {
@@ -108,7 +134,7 @@ void DLInsertLast(tDLList *L, int val) {
 ** V případě, že není dostatek paměti pro nový prvek při operaci malloc,
 ** volá funkci DLError().
 **/ 	
-	
+	tDLElemPtr ptr = L.First;
 	
  solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
@@ -119,9 +145,10 @@ void DLFirst (tDLList *L) {
 ** Funkci implementujte jako jediný příkaz (nepočítáme-li return),
 ** aniž byste testovali, zda je seznam L prázdný.
 **/
+
 	
 
- solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
+ 	//solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
 
 void DLLast (tDLList *L) {
@@ -266,6 +293,7 @@ void DLPred (tDLList *L) {
  solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
 }
 
+
 int DLActive (tDLList *L) {
 /*
 ** Je-li seznam L aktivní, vrací nenulovou hodnotu, jinak vrací 0.
@@ -273,7 +301,8 @@ int DLActive (tDLList *L) {
 **/
 	
 	
- solved = FALSE;                   /* V případě řešení, smažte tento řádek! */
+ solved = FALSE;   
+ return 0;               /* V případě řešení, smažte tento řádek! */
 }
 
 /* Konec c206.c*/
