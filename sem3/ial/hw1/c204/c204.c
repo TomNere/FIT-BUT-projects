@@ -32,7 +32,6 @@
 **/
 
 #include "c204.h"
-#include "stdio.h"
 
 int solved;
 
