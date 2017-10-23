@@ -60,14 +60,13 @@ void stackInit ( tStack* s ) {
 ** volejte funkci stackError(SERR_INIT). U ostatních funkcí pro zjednodušení
 ** předpokládejte, že tato situace nenastane. 
 */
+	//handle error
 	if (s == NULL) {
 		stackError(SERR_INIT);
 		return;
 	}
 
 	s->top = -1;
-
-	//solved = 0;                      /* V případě řešení, smažte tento řádek! */
 }
 
 int stackEmpty ( const tStack* s ) {
@@ -76,8 +75,8 @@ int stackEmpty ( const tStack* s ) {
 ** Funkci implementujte jako jediný příkaz. Vyvarujte se zejména konstrukce
 ** typu "if ( true ) b=true else b=false".
 */
+	//if stop == -1, return true
 	return (s->top == -1);
-	//  solved = 0;                      /* V případě řešení, smažte tento řádek! */
 }
 
 int stackFull ( const tStack* s ) {
@@ -89,8 +88,8 @@ int stackFull ( const tStack* s ) {
 **
 ** Funkci implementujte jako jediný příkaz.
 */
+	//if s-top == STACK_SIZE-1, return true
 	return ((STACK_SIZE-1) == s->top);
-	//solved = 0;                      /* V případě řešení, smažte tento řádek! */
 }
 
 void stackTop ( const tStack* s, char* c ) {
@@ -103,14 +102,14 @@ void stackTop ( const tStack* s, char* c ) {
 ** Pro ověření, zda je zásobník prázdný, použijte dříve definovanou
 ** funkci stackEmpty.
 */
+	//if stack is empty
 	if (stackEmpty(s)) {
+		stackError(SERR_PUSH);
 		return;
 	}
 
+	//insert character from top
 	*c = s->arr[s->top]; 
-	
-	//solved = 0;                      /* V případě řešení, smažte tento řádek! */
-	
 }
 
 
@@ -126,13 +125,13 @@ void stackPop ( tStack* s ) {
 ** jednoduchost neděláme.
 ** 
 */
+	//if stack is empty
 	if (stackEmpty(s)) {
 		return;
 	}
 
-	--(s->top);
-
-	//solved = 0;                      /* V případě řešení, smažte tento řádek! */
+	//decrement top
+	(s->top)--;
 }
 
 
@@ -144,16 +143,15 @@ void stackPush ( tStack* s, char c ) {
 ** Pro ověření, zda je zásobník plný, použijte dříve definovanou
 ** funkci stackFull.
 */
+	//if stack is full
 	if (stackFull(s)) {
 		stackError(SERR_PUSH);
 		return;
 	}
 
-	++(s->top);
+	//increment top and insert character
+	(s->top)++;
 	s->arr[s->top] = c;
-	
-
-	//solved = 0;                      /* V případě řešení, smažte tento řádek! */
 }
 
 /* Konec c202.c */

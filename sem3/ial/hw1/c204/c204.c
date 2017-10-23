@@ -49,17 +49,21 @@ int solved;
 ** nadeklarovat a používat pomocnou proměnnou typu char.
 */
 void untilLeftPar ( tStack* s, char* postExpr, unsigned* postLen ) {
+	
+	//get first character
 	char tmp;
 	stackTop(s, &tmp);
 
+	//if the character isn't '(' repeat 
 	while (tmp != '(') {
-		stackTop(s, &tmp);
+		//stackTop(s, &tmp);
 		postExpr[*postLen] = tmp;
 		stackPop(s);
 		stackTop(s, &tmp);
 		(*postLen)++;
 	}
 
+	//delete '('
 	stackPop(s);
 }
 
@@ -74,46 +78,50 @@ void untilLeftPar ( tStack* s, char* postExpr, unsigned* postLen ) {
 ** představuje parametr postLen, výstupním polem znaků je opět postExpr.
 */
 void doOperation ( tStack* s, char c, char* postExpr, unsigned* postLen ) {
+
 	//if '('
 	if (c == '(') {
-				stackPush(s, c);
-			}
-			else {
-				//if it's a operator
-				
-				if (c!=')') {
-					do {
-						char top;
-						if (!stackEmpty(s)){
-						stackTop(s, &top);
-						}
-						
-						//if stack is empty or on the top is '('
-						if (stackEmpty(s) || (top == '(')) {
-							stackPush(s, c);
-							c = '0';
-							//printf("pushujem\n");
-						}
-						else {
-							//if on the top of stack is operator with lower priority
-							if (((c == '*') || (c == '/')) && ((top == '+') || (top == '-'))) {
-								stackPush(s, c);
-								c = '0';
-							}
-							//on the top of stack is operator with the same of higher priority
-							else {
-								stackTop(s, &postExpr[*postLen]);
-								stackPop(s);
-								(*postLen)++;
-							}
-						}
-					} while (c != '0');	
-				} 
-				// if it's ')' call untilLeftPar
-				else {
-					untilLeftPar(s, postExpr, postLen);
+		stackPush(s, c);
+	}
+	else {
+		//if it's a operator
+		if (c!=')') {
+			do {
+				char tmp;
+				//if stack isn't empty, get the character
+				if (!stackEmpty(s)) {
+					stackTop(s, &tmp);
 				}
-			}
+				else {
+					tmp = '@';		//'@' signalized top is empty
+				}
+				
+				//if stack is empty or on the top is '('
+				if ((tmp == '@') || (tmp == '(')) {
+					stackPush(s, c);
+					c = '@';		//use to terminate cycle
+				}
+				else {
+					//if on the top of stack is operator with lower priority
+					if (((c == '*') || (c == '/')) && ((tmp == '+') || (tmp == '-'))) {
+						stackPush(s, c);
+						c = '@';		//use to terminate cycle
+					}
+					//on the top of stack is operator with the same of higher priority
+					else {
+						stackTop(s, &postExpr[*postLen]);
+						stackPop(s);
+						(*postLen)++;
+					}
+				}
+			} while (c != '@');			//end of cycle
+		} 
+
+		// if it's ')' call untilLeftPar
+		else {
+			untilLeftPar(s, postExpr, postLen);
+		}
+	}
 }
 
 /* 
@@ -165,49 +173,46 @@ char* infix2postfix (const char* infExpr) {
 	//new string allocation
 	char* newExpr = malloc(MAX_LEN * sizeof(char));
 
+	//handle error
 	if (newExpr == NULL) {
 		return NULL; 
 	}
 
-	//allocation of stack
-	tStack* myStack = malloc(MAX_LEN * sizeof(char));
-	stackInit(myStack);
+	//create stack
+	tStack myStack;
+	stackInit(&myStack);
 
 	unsigned counter = 0;
 	unsigned newExprLen = 0;
+
+	//repeat until character isn't '='
 	while (infExpr[counter] != '=') {
-		//if it's operand, else doOperation
+		//if it's alpha numeric character-operand, add to newExpr, else doOperation
 		if ((infExpr[counter]>='A' && infExpr[counter]<='Z') || 
 			(infExpr[counter]>='a' && infExpr[counter]<='z') || 
 			(infExpr[counter]>='0' && infExpr[counter]<='9')) {
 			newExpr[newExprLen] = infExpr[counter];
 			newExprLen++;
-			//printf("concatenujem,%s\n", newExpr);
 		}
 		else {
-			doOperation(myStack, infExpr[counter], newExpr, &newExprLen);
+			doOperation(&myStack, infExpr[counter], newExpr, &newExprLen);
 		}
 
+		//move to next character in infExpr
 		counter++;
-
 	}
 
-	printf("test stringu:%s\n", newExpr);
-
-	while (!stackEmpty(myStack)) {
-		stackTop(myStack, &newExpr[newExprLen]);
-		stackPop(myStack);
+	//add rest characters to newExpr
+	while (!stackEmpty(&myStack)) {
+		stackTop(&myStack, &newExpr[newExprLen]);
+		stackPop(&myStack);
 		newExprLen++;
-		printf("doplnam\n");
 	}
 
-	free(myStack);
 	newExpr[newExprLen] = '=';
 	newExpr[newExprLen+1] = '\0';
 
 	return newExpr;
-
-    //solved = 0;                        /* V případě řešení smažte tento řádek! */
 }
 
 /* Konec c204.c */
