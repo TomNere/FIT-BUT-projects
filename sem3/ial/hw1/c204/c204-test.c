@@ -148,6 +148,10 @@ int main (int argc, char* argv[]) {
   printf("[TEST15] Complex expression conversion\n");
   printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
   convert_and_verify("(A*0+b)*((c*(1+D))-(e/(3*f+g)))=", "A0*b+c1D+*e3f*g+/-*=");
+
+  printf("[TEST16] Complex expression conversion\n");
+  printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+  convert_and_verify("A*(B+C)-D/(C-A)*(B+D)+(A-C+B)/F=", "ABC+*DCA-/BD+*-AC-B+F/+=");
   
   printf("\n----- C204 - The End of Basic Tests -----\n");
 

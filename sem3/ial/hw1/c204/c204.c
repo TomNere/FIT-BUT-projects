@@ -49,31 +49,22 @@ int solved;
 ** nadeklarovat a používat pomocnou proměnnou typu char.
 */
 void untilLeftPar ( tStack* s, char* postExpr, unsigned* postLen ) {
+	
+	//get first character
+	char tmp;
+	stackTop(s, &tmp);
 
-    char tmp_top = '0';                         // pomocná premenná do ktorej uložíme vrchol zásobníku aby sme zmenšili počet prístupov do štruktúry
+	//if the character isn't '(' repeat 
+	while (tmp != '(') {
+		//stackTop(s, &tmp);
+		postExpr[*postLen] = tmp;
+		stackPop(s);
+		stackTop(s, &tmp);
+		(*postLen)++;
+	}
 
-    if(stackEmpty(s) == 0) {
-            stackTop(s, &tmp_top);              // ak nie je zásobník prázdny vloží do tmp_top vrchol zásobníku
-    }
-    
-
-    while(tmp_top != '(') {                     // cyklus dokiaľ nie je na vrchu '(' tak vkladáme operátory do výstupného reťazcu
-
-        if(stackEmpty(s) != 0) {                // ukončenie pokiaľ by bol zásobník prázdny
-            return;
-        }
-
-        else {
-            postExpr[*postLen] = tmp_top;       // vloženie vrcholu zásobníka na výstupný reťazec
-            (*postLen)++;
-            stackPop(s);                        // uvolnenie vloženého operátora zo zásobníku
-
-            if(stackEmpty(s) == 0) {
-                stackTop(s, &tmp_top);          // pokiaľ nie je zásobník prázdny načítame nový vrchol zásobníku
-            }
-        }
-    }
-    stackPop(s);                                // vymazanie '(' zo zásobníku
+	//delete '('
+	stackPop(s);
 }
 
 /*
@@ -88,46 +79,49 @@ void untilLeftPar ( tStack* s, char* postExpr, unsigned* postLen ) {
 */
 void doOperation ( tStack* s, char c, char* postExpr, unsigned* postLen ) {
 
-    char tmp_top = '0';                 // pomocná premenná do ktorej uložíme vrchol zásobníku aby sme zmenšili počet prístupov do štruktúry
+	//if '('
+	if (c == '(') {
+		stackPush(s, c);
+	}
+	else {
+		//if it's a operator
+		if (c!=')') {
+			do {
+				char tmp;
+				//if stack isn't empty, get the character
+				if (!stackEmpty(s)) {
+					stackTop(s, &tmp);
+				}
+				else {
+					tmp = '@';		//'@' signalized top is empty
+				}
+				
+				//if stack is empty or on the top is '('
+				if ((tmp == '@') || (tmp == '(')) {
+					stackPush(s, c);
+					c = '@';		//use to terminate cycle
+				}
+				else {
+					//if on the top of stack is operator with lower priority
+					if (((c == '*') || (c == '/')) && ((tmp == '+') || (tmp == '-'))) {
+						stackPush(s, c);
+						c = '@';		//use to terminate cycle
+					}
+					//on the top of stack is operator with the same of higher priority
+					else {
+						stackTop(s, &postExpr[*postLen]);
+						stackPop(s);
+						(*postLen)++;
+					}
+				}
+			} while (c != '@');			//end of cycle
+		} 
 
-    if(stackEmpty(s) == 0) {
-        stackTop(s, &tmp_top);          // ak nie je zásobník prázdny vloží do tmp_top vrchol zásobníku
-    }
-
-    if( (c == '(') || stackEmpty(s) || (tmp_top == '(') ) {         // podmienka pokiaľ je nový znák '(' alebo je zásobník prázdny, alebo je na vrchole '(' vloží nový operátor na zásobník
-        stackPush(s, c);                                            // vloženie nového operátora na zásobník
-    }
-
-    else if(    ( (c == '+') && (c != tmp_top) && (tmp_top != '-') && (tmp_top != '*') && (tmp_top != '/') ) ||         // podmienky pre operátor '+' aby mohol byť vložený 
-                ( (c == '-') && (c != tmp_top) && (tmp_top != '+') && (tmp_top != '*') && (tmp_top != '/') ) ||         // podmienky pre operátor '-' aby mohol byť vložený
-                ( (c == '*') && (c != tmp_top) && (tmp_top != '/') ) ||                                                 // podmienky pre operátor '*' aby mohol byť vložený
-                ( (c == '/') && (c != tmp_top) && (tmp_top != '*') ) ) {                                                // podmienky pre operátor '/' aby mohol byť vložený 
-        stackPush(s, c);
-    }
-
-    else if( c == ')') {
-        untilLeftPar(s, postExpr, postLen);                                                                             // pokiaľ je operátor ')' zavolá funkciu untilLeftPar
-    }
-
-    else {
-        while( (stackEmpty(s) == 0) && (tmp_top != '(') ) {                                                             // uvolnenie zvyšku zásobníka alebo po najbližšiu '(' ak príde operátor s nižšou prioritou ako je na vrchu
-            postExpr[*postLen] = tmp_top;                                                                               // vloženie vrcholu do výstupného pola                                                              
-            (*postLen)++;
-            stackPop(s);
-
-            if(stackEmpty(s) == 0) {    
-                stackTop(s, &tmp_top);
-            }
-        }
-
-        if( c == '=') {                             // pokiaľ je operátor '=' tak vloží na koniec reťazca '=' a '\0'
-            postExpr[*postLen] = c;
-            (*postLen)++;
-            postExpr[*postLen] = '\0';
-        }
-
-        doOperation(s, c, postExpr, postLen);    //rekurzívne volanie ak nie je koniec reťazca
-    }
+		// if it's ')' call untilLeftPar
+		else {
+			untilLeftPar(s, postExpr, postLen);
+		}
+	}
 }
 
 /* 
@@ -176,33 +170,49 @@ void doOperation ( tStack* s, char c, char* postExpr, unsigned* postLen ) {
 */
 char* infix2postfix (const char* infExpr) {
 
-    char* postExpr = (char*) malloc(MAX_LEN);       //alokovanie pamäti pre nové výsupné pole
+	//new string allocation
+	char* newExpr = malloc(MAX_LEN * sizeof(char));
 
-    if(postExpr == NULL) {          // overenie či sa podarila alokácia
-        return NULL;
-    }
+	//handle error
+	if (newExpr == NULL) {
+		return NULL; 
+	}
 
-    unsigned postLen = 0;       // pomocná premenná pre počítanie d´´lžky výstupného reťazca
+	//create stack
+	tStack myStack;
+	stackInit(&myStack);
 
-    tStack s;                   // vytvorenie zásobníka
-    stackInit(&s);
+	unsigned counter = 0;
+	unsigned newExprLen = 0;
 
-    for(int i = 0; infExpr[i] != '\0'; i++) {
-        if(
-            ( (infExpr[i] >= 'a') && (infExpr[i] <= 'z') ) ||           // načítavanie znakov malej abecedy
-            ( (infExpr[i] >= 'A') && (infExpr[i] <= 'Z') ) ||           // načítavanie znakov velkej abecedy
-            ( (infExpr[i] >= '0') && (infExpr[i] <= '9') ) ) {          // načítavanie čísiel
+	//repeat until character isn't '='
+	while (infExpr[counter] != '=') {
+		//if it's alpha numeric character-operand, add to newExpr, else doOperation
+		if ((infExpr[counter]>='A' && infExpr[counter]<='Z') || 
+			(infExpr[counter]>='a' && infExpr[counter]<='z') || 
+			(infExpr[counter]>='0' && infExpr[counter]<='9')) {
+			newExpr[newExprLen] = infExpr[counter];
+			newExprLen++;
+		}
+		else {
+			doOperation(&myStack, infExpr[counter], newExpr, &newExprLen);
+		}
 
-            postExpr[postLen] = infExpr[i];
-            postLen++; 
-        }
+		//move to next character in infExpr
+		counter++;
+	}
 
-        else {
-            doOperation(&s, infExpr[i], postExpr, &postLen);            // ak načítame operátor voláme funkciu doOperation
-        }
-    }
+	//add rest characters to newExpr
+	while (!stackEmpty(&myStack)) {
+		stackTop(&myStack, &newExpr[newExprLen]);
+		stackPop(&myStack);
+		newExprLen++;
+	}
 
-    return postExpr;                                // vrátime výsledný reťazec
+	newExpr[newExprLen] = '=';
+	newExpr[newExprLen+1] = '\0';
+
+	return newExpr;
 }
 
 /* Konec c204.c */
