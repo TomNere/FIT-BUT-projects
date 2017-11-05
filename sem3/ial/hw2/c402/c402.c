@@ -211,10 +211,12 @@ void Leftmost_Preorder (tBTNodePtr ptr, tStackP *Stack)	{
 ** Při průchodu Preorder navštívené uzly zpracujeme voláním funkce BTWorkOut()
 ** a ukazatele na ně is uložíme do zásobníku.
 **/
-	while (ptr != NULL) {
-		SPushP(Stack, ptr);
-		BTWorkOut(ptr);
-		ptr = ptr->LPtr;
+	tBTNodePtr tmp = ptr;
+
+	while (tmp != NULL) {
+		SPushP(Stack, tmp);
+		BTWorkOut(tmp);
+		tmp = tmp->LPtr;
 	}
 	
 	
@@ -227,15 +229,15 @@ void BTPreorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Preorder a zásobníku ukazatelů. Zpracování jednoho uzlu stromu
 ** realizujte jako volání funkce BTWorkOut(). 
 **/
-	StackP stack;
-	SInitP(stack);
-	Leftmost_Preorder(RootPtr, stack);
+	tStackP stack;
+	SInitP(&stack);
+	Leftmost_Preorder(RootPtr, &stack);
 
-	tBTNodePtr ptr = RootPtr;
+	tBTNodePtr tmp = RootPtr;
 
-	while (!SEmptyP(stack)) {
-		STopPopP(stack, ptr);
-		Leftmost_Preorder(ptr->RPtr, stack);
+	while (!SEmptyP(&stack)) {
+		tmp = STopPopP(&stack);
+		Leftmost_Preorder(tmp->RPtr, &stack);
 	}
 	
 	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
@@ -280,10 +282,15 @@ void Leftmost_Postorder (tBTNodePtr ptr, tStackP *StackP, tStackB *StackB) {
 ** a současně do zásobníku bool hodnot ukládáme informaci, zda byl uzel
 ** navštíven poprvé a že se tedy ještě nemá zpracovávat. 
 **/
+	tBTNodePtr tmp = ptr;
 
+	while (tmp != NULL) {
+		SPushP(StackP, tmp);
+		SPushB(StackB, TRUE);
+		tmp = tmp->LPtr;
+	}
 	
-	
-	 solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 void BTPostorder (tBTNodePtr RootPtr)	{
@@ -292,10 +299,34 @@ void BTPostorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Postorder, zásobníku ukazatelů a zásobníku hotdnot typu bool.
 ** Zpracování jednoho uzlu stromu realizujte jako volání funkce BTWorkOut(). 
 **/
+	bool leftFlag;
 
-	
+	tStackP stackP;
+	tStackB stackB;
+
+	SInitP(&stackP);
+	SInitB(&stackB);
+
+	tBTNodePtr tmp = RootPtr;
+
+	Leftmost_Postorder(tmp, &stackP, &stackB);
+
+	while (!SEmptyP(&stackP)) {
+		tmp = STopPopP(&stackP);
+		SPushP(&stackP, tmp);
+		leftFlag = STopPopB(&stackB);
+
+		if (leftFlag) {
+			SPushB (&stackB, FALSE);
+			Leftmost_Postorder(tmp->RPtr, &stackP, &stackB);
+		}
+		else {
+			STopPopP(&stackP);
+			BTWorkOut(tmp);
+		}
+	}
 		
-	 solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 
