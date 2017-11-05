@@ -348,10 +348,29 @@ void BTDisposeTree (tBTNodePtr *RootPtr)	{
 **
 ** Funkci implementujte nerekurzivně s využitím zásobníku ukazatelů.
 **/
+	tStackP stack;
+	SInitP(&stack);
 
+	tBTNodePtr tmp;
+
+	do {
+		if (*RootPtr == NULL) {
+			if (!SEmptyP(&stack)) {
+				*RootPtr = STopPopP(&stack);
+			}
+		}
+		else {
+			if ((*RootPtr)->RPtr != NULL) {
+				SPushP(&stack, (*RootPtr)->RPtr);
+				tmp = *RootPtr;
+				*RootPtr = (*RootPtr)->LPtr;
+				free(tmp);
+			}
+		}
+	} until (*RootPtr == NULL && SEmptyP(stack));
 	
 	
-	 solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 /* konec c402.c */
