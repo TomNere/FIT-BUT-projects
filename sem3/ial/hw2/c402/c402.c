@@ -213,6 +213,8 @@ void Leftmost_Preorder (tBTNodePtr ptr, tStackP *Stack)	{
 **/
 	while (ptr != NULL) {
 		SPushP(Stack, ptr);
+		BTWorkOut(ptr);
+		ptr = ptr->LPtr;
 	}
 	
 	
@@ -225,10 +227,10 @@ void BTPreorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Preorder a zásobníku ukazatelů. Zpracování jednoho uzlu stromu
 ** realizujte jako volání funkce BTWorkOut(). 
 **/
-
 	
 	
-	 solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	
+	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 
