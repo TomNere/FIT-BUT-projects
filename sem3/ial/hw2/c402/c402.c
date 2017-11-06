@@ -203,7 +203,7 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 		(*RootPtr)->RPtr = NULL;
 	}
 	else {
-		RootPtr tmp = *RootPtr
+		tBTNodePtr tmp = *RootPtr;
 		while (TRUE) {
 			if (Content < tmp->Cont) {
 				if (tmp->LPtr == NULL) {
@@ -211,7 +211,7 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 					tmp->LPtr->Cont = Content;
 					tmp->LPtr->LPtr = NULL; 
 					tmp->LPtr->RPtr = NULL;
-					return void;
+					return;
 				}
 				tmp = tmp->LPtr;
 			}
@@ -221,12 +221,12 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 					tmp->RPtr->Cont = Content;
 					tmp->RPtr->LPtr = NULL; 
 					tmp->RPtr->RPtr = NULL;
-					return void;
+					return;
 				}
 				tmp = tmp->RPtr;
 			}
 			else {
-				return void;
+				return;
 			}
 		}
 	}
@@ -303,14 +303,15 @@ void BTInorder (tBTNodePtr RootPtr)	{
 **/
 	tStackP stack;
 	SInitP(&stack);
-	Leftmost_Preorder(RootPtr, &stack);
+
+	Leftmost_Inorder(RootPtr, &stack);
 
 	tBTNodePtr tmp = RootPtr;
 
 	while (!SEmptyP(&stack)) {
 		tmp = STopPopP(&stack);
+		Leftmost_Inorder(tmp->RPtr, &stack);
 		BTWorkOut(tmp);
-		Leftmost_Preorder(tmp->RPtr, &stack);
 	}
 	
 	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
@@ -399,7 +400,7 @@ void BTDisposeTree (tBTNodePtr *RootPtr)	{
 				free(tmp);
 			}
 		}
-	} until (*RootPtr == NULL && SEmptyP(stack));
+	} while (!(*RootPtr == NULL && SEmptyP(&stack)));
 	
 	
 	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
