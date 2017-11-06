@@ -395,10 +395,10 @@ void BTDisposeTree (tBTNodePtr *RootPtr)	{
 		else {
 			if ((*RootPtr)->RPtr != NULL) {
 				SPushP(&stack, (*RootPtr)->RPtr);
-				tmp = *RootPtr;
-				*RootPtr = (*RootPtr)->LPtr;
-				free(tmp);
 			}
+			tmp = *RootPtr;
+			*RootPtr = (*RootPtr)->LPtr;
+			free(tmp);
 		}
 	} while (!(*RootPtr == NULL && SEmptyP(&stack)));
 	
