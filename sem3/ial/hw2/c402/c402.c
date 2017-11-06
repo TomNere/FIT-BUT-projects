@@ -196,10 +196,42 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 ** se ve stromu může vyskytnout nejvýše jednou). Pokud se vytváří nový uzel,
 ** vzniká vždy jako list stromu. Funkci implementujte nerekurzivně.
 **/
-	
-	
+	if (*RootPtr == NULL) {
+		*RootPtr = malloc(sizeof(struct tBTNode));
+		(*RootPtr)->Cont = Content;
+		(*RootPtr)->LPtr = NULL;
+		(*RootPtr)->RPtr = NULL;
+	}
+	else {
+		RootPtr tmp = *RootPtr
+		while (TRUE) {
+			if (Content < tmp->Cont) {
+				if (tmp->LPtr == NULL) {
+					tmp->LPtr = malloc(sizeof(struct tBTNode));
+					tmp->LPtr->Cont = Content;
+					tmp->LPtr->LPtr = NULL; 
+					tmp->LPtr->RPtr = NULL;
+					return void;
+				}
+				tmp = tmp->LPtr;
+			}
+			else if (Content > tmp->Cont) {
+				if (tmp->RPtr == NULL) {
+					tmp->RPtr = malloc(sizeof(struct tBTNode));
+					tmp->RPtr->Cont = Content;
+					tmp->RPtr->LPtr = NULL; 
+					tmp->RPtr->RPtr = NULL;
+					return void;
+				}
+				tmp = tmp->RPtr;
+			}
+			else {
+				return void;
+			}
+		}
+	}
 		
-	 solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 /*                                  PREORDER                                  */
