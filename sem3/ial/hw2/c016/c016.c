@@ -68,8 +68,10 @@ int hashCode ( tKey key ) {
 */
 
 void htInit ( tHTable* ptrht ) {
-
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+	for (int i = 0; i < MAX_HTSIZE; i++) {
+		*ptrht[i] = NULL; 
+	}
+ 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* TRP s explicitně zřetězenými synonymy.
