@@ -229,9 +229,7 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 				return;
 			}
 		}
-	}
-		
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	}	
 }
 
 /*                                  PREORDER                                  */
@@ -249,10 +247,7 @@ void Leftmost_Preorder (tBTNodePtr ptr, tStackP *Stack)	{
 		SPushP(Stack, tmp);
 		BTWorkOut(tmp);
 		tmp = tmp->LPtr;
-	}
-	
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	}	
 }
 
 void BTPreorder (tBTNodePtr RootPtr)	{
@@ -271,8 +266,6 @@ void BTPreorder (tBTNodePtr RootPtr)	{
 		tmp = STopPopP(&stack);
 		Leftmost_Preorder(tmp->RPtr, &stack);
 	}
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 
@@ -291,8 +284,6 @@ void Leftmost_Inorder(tBTNodePtr ptr, tStackP *Stack)		{
 		SPushP(Stack, tmp);
 		tmp = tmp->LPtr;
 	}
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
-	
 }
 
 void BTInorder (tBTNodePtr RootPtr)	{
@@ -313,8 +304,6 @@ void BTInorder (tBTNodePtr RootPtr)	{
 		Leftmost_Inorder(tmp->RPtr, &stack);
 		BTWorkOut(tmp);
 	}
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 /*                                 POSTORDER                                  */ 
@@ -334,8 +323,6 @@ void Leftmost_Postorder (tBTNodePtr ptr, tStackP *StackP, tStackB *StackB) {
 		SPushB(StackB, TRUE);
 		tmp = tmp->LPtr;
 	}
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 void BTPostorder (tBTNodePtr RootPtr)	{
@@ -370,8 +357,6 @@ void BTPostorder (tBTNodePtr RootPtr)	{
 			BTWorkOut(tmp);
 		}
 	}
-		
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 
@@ -400,10 +385,7 @@ void BTDisposeTree (tBTNodePtr *RootPtr)	{
 			*RootPtr = (*RootPtr)->LPtr;
 			free(tmp);
 		}
-	} while (!(*RootPtr == NULL && SEmptyP(&stack)));
-	
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
+	} while (!(*RootPtr == NULL && SEmptyP(&stack)));	
 }
 
 /* konec c402.c */

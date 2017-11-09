@@ -71,7 +71,6 @@ void htInit ( tHTable* ptrht ) {
 	for (int i = 0; i < MAX_HTSIZE; i++) {
 		(*ptrht)[i] = NULL; 
 	}
- 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* TRP s explicitně zřetězenými synonymy.
@@ -92,8 +91,6 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 		ptr = ptr->ptrnext;
 	}
 	return NULL;
-
- 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* 
@@ -121,8 +118,6 @@ void htInsert ( tHTable* ptrht, tKey key, tData data ) {
 		ptr->key = key;
 		ptr->data = data;
 	}
-
- 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /*
@@ -142,7 +137,6 @@ tData* htRead ( tHTable* ptrht, tKey key ) {
 	else {
 		return NULL;
 	}
- 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /*
@@ -177,7 +171,6 @@ void htDelete ( tHTable* ptrht, tKey key ) {
 			ptr = ptr->ptrnext;
 		}
 	}
-	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* TRP s explicitně zřetězenými synonymy.
@@ -198,5 +191,4 @@ void htClearAll ( tHTable* ptrht ) {
 			}
 		}
 	}
- 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
