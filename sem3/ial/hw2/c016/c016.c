@@ -69,7 +69,7 @@ int hashCode ( tKey key ) {
 
 void htInit ( tHTable* ptrht ) {
 	for (int i = 0; i < MAX_HTSIZE; i++) {
-		*ptrht[i] = NULL; 
+		(*ptrht)[i] = NULL; 
 	}
  	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
@@ -83,10 +83,10 @@ void htInit ( tHTable* ptrht ) {
 
 tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 	//int i = hashCode(key);
-	tHTItem* ptr = *ptrht[hashCode(key)];
+	tHTItem* ptr = (*ptrht)[hashCode(key)];
 
 	while (ptr != NULL) {
-		if (ptr->key == key) {
+		if (!strcmp(ptr->key, key)) {
 			return ptr;
 		}
 		ptr = ptr->ptrnext;
@@ -109,15 +109,15 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 **/
 
 void htInsert ( tHTable* ptrht, tKey key, tData data ) {
-	tHTItem* ptr;
+	tHTItem* ptr = NULL;
 
 	if ((ptr = htSearch(ptrht, key)) != NULL) {
 		ptr->data = data;
 	}
 	else {
 		ptr = malloc (sizeof(tHTItem));
-		ptr->ptrnext = *ptrht[hashCode(key)];
-		*ptrht[hashCode(key)] = ptr;
+		ptr->ptrnext = (*ptrht)[hashCode(key)];
+		(*ptrht)[hashCode(key)] = ptr;
 		ptr->key = key;
 		ptr->data = data;
 	}
@@ -156,14 +156,15 @@ tData* htRead ( tHTable* ptrht, tKey key ) {
 */
 
 void htDelete ( tHTable* ptrht, tKey key ) {
-	tHTItem* ptr = *ptrht[hashCode(key)];
+	int i = hashCode(key);
+	tHTItem* ptr = (*ptrht)[i];
 	tHTItem* tmp;
 
 	if (ptr != NULL) {
-		if (ptr->key == key) {
+		if (!strcmp(ptr->key, key)) {
 			tmp = ptr->ptrnext;
 			free(ptr);
-			ptr = tmp;
+			(*ptrht)[i] = tmp;
 			return;
 		}
 		while (ptr->ptrnext != NULL) {
@@ -171,6 +172,7 @@ void htDelete ( tHTable* ptrht, tKey key ) {
 				tmp = ptr->ptrnext;
 				ptr->ptrnext = ptr->ptrnext->ptrnext;
 				free(tmp);
+				tmp = NULL;
 			}
 			ptr = ptr->ptrnext;
 		}
@@ -184,6 +186,17 @@ void htDelete ( tHTable* ptrht, tKey key ) {
 */
 
 void htClearAll ( tHTable* ptrht ) {
+	tHTItem* ptr;
+	for (int i = 0; i < MAX_HTSIZE; i++) {
+		if ((*ptrht)[i] != NULL) {
 
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+			while ((*ptrht)[i] != NULL) {
+				ptr = (*ptrht)[i];
+				(*ptrht)[i] = ptr->ptrnext;
+				free(ptr);
+				ptr = NULL;
+			}
+		}
+	}
+ 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
