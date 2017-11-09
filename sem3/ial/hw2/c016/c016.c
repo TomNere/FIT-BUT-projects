@@ -82,8 +82,8 @@ void htInit ( tHTable* ptrht ) {
 */
 
 tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
-	//int i = (int) *key;
-	tHTItem* ptr = *ptrht[(int) *key];
+	//int i = hashCode(key);
+	tHTItem* ptr = *ptrht[hashCode(key)];
 
 	while (ptr != NULL) {
 		if (ptr->key == key) {
@@ -94,7 +94,7 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 	return NULL;
 
  	//solved = 0; /*v pripade reseni, smazte tento radek!*/
-}a
+}
 
 /* 
 ** TRP s explicitně zřetězenými synonymy.
@@ -109,24 +109,15 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 **/
 
 void htInsert ( tHTable* ptrht, tKey key, tData data ) {
-	tHTItem* ptr = *ptrht[(int) *key];
-	bool found = false;
+	tHTItem* ptr = *ptrht[hashCode(key)];
 
-	while (ptr != NULL) {
-		if (ptr->key == key) {
-			found = true;
-			break;
-		}
-		ptr = ptr->ptrnext;
-	}
-
-	if (found) {
+	if (htSearch(ptrht, key) != NULL) {
 		ptr->data = data;
 	}
 	else {
 		ptr = malloc (sizeof(tHTItem));
-		ptr->ptrnext = *ptrht[(int) *key];
-		*ptrht[(int) *key] = ptr;
+		ptr->ptrnext = *ptrht[hashCode(key)];
+		*ptrht[hashCode(key)] = ptr;
 		ptr->key = key;
 		ptr->data = data;
 	}
