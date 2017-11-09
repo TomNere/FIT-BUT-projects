@@ -94,7 +94,7 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 	return NULL;
 
  	//solved = 0; /*v pripade reseni, smazte tento radek!*/
-}
+}a
 
 /* 
 ** TRP s explicitně zřetězenými synonymy.
@@ -109,8 +109,29 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 **/
 
 void htInsert ( tHTable* ptrht, tKey key, tData data ) {
+	tHTItem* ptr = *ptrht[(int) *key];
+	bool found = false;
 
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+	while (ptr != NULL) {
+		if (ptr->key == key) {
+			found = true;
+			break;
+		}
+		ptr = ptr->ptrnext;
+	}
+
+	if (found) {
+		ptr->data = data;
+	}
+	else {
+		ptr = malloc (sizeof(tHTItem));
+		ptr->ptrnext = *ptrht[(int) *key];
+		*ptrht[(int) *key] = ptr;
+		ptr->key = key;
+		ptr->data = data;
+	}
+
+ 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /*
