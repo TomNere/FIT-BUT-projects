@@ -109,9 +109,9 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 **/
 
 void htInsert ( tHTable* ptrht, tKey key, tData data ) {
-	tHTItem* ptr = *ptrht[hashCode(key)];
+	tHTItem* ptr;
 
-	if (htSearch(ptrht, key) != NULL) {
+	if ((ptr = htSearch(ptrht, key)) != NULL) {
 		ptr->data = data;
 	}
 	else {
@@ -135,8 +135,14 @@ void htInsert ( tHTable* ptrht, tKey key, tData data ) {
 */
 
 tData* htRead ( tHTable* ptrht, tKey key ) {
-
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+	tHTItem* ptr;
+	if ((ptr = htSearch(ptrht, key)) != NULL) {
+		return &(ptr->data);
+	}
+	else {
+		return NULL;
+	}
+ 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /*
@@ -150,8 +156,26 @@ tData* htRead ( tHTable* ptrht, tKey key ) {
 */
 
 void htDelete ( tHTable* ptrht, tKey key ) {
+	tHTItem* ptr = *ptrht[hashCode(key)];
+	tHTItem* tmp;
 
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+	if (ptr != NULL) {
+		if (ptr->key == key) {
+			tmp = ptr->ptrnext;
+			free(ptr);
+			ptr = tmp;
+			return;
+		}
+		while (ptr->ptrnext != NULL) {
+			if (ptr->ptrnext->key == key) {
+				tmp = ptr->ptrnext;
+				ptr->ptrnext = ptr->ptrnext->ptrnext;
+				free(tmp);
+			}
+			ptr = ptr->ptrnext;
+		}
+	}
+	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* TRP s explicitně zřetězenými synonymy.
