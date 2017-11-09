@@ -82,8 +82,18 @@ void htInit ( tHTable* ptrht ) {
 */
 
 tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
+	//int i = (int) *key;
+	tHTItem* ptr = *ptrht[(int) *key];
 
- solved = 0; /*v pripade reseni, smazte tento radek!*/
+	while (ptr != NULL) {
+		if (ptr->key == key) {
+			return ptr;
+		}
+		ptr = ptr->ptrnext;
+	}
+	return NULL;
+
+ 	//solved = 0; /*v pripade reseni, smazte tento radek!*/
 }
 
 /* 
