@@ -44,7 +44,7 @@ Vlozime dalsi prvky a vytvorime tak symetricky binarni strom
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Struktura binarniho stromu:
 
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -106,7 +106,7 @@ Struktura binarniho stromu:
               |        |
               |        +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -156,7 +156,7 @@ Struktura binarniho stromu:
               |        |
               |        +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -202,7 +202,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -246,7 +246,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -290,7 +290,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -332,7 +332,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -374,7 +374,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -414,7 +414,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -452,7 +452,7 @@ Struktura binarniho stromu:
               |     |
               |     +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -486,7 +486,7 @@ Struktura binarniho stromu:
               |  |
               |  +-[P,10]
               |
-           +-[O,16]
+           +-[O,15]
            |
         +-[N,14]
         |  |
@@ -508,6 +508,168 @@ Struktura binarniho stromu:
 
 =================================================
 [TEST20]
+Nakonec zrusime cely strom
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Struktura binarniho stromu:
+
+strom je prazdny
+
+=================================================
+[TEST21]
+Vlozime dalsi prvky a vytvorime tak degradovany binarni strom 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Struktura binarniho stromu:
+
+                       +-[J,10]
+                       |
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+
+=================================================
+[TEST22]
+Pokusime se vyhledat polozky s klici 'E', 'F'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Polozka byla nalezena !
+Polozka obsahuje hodnotu 5 
+Polozka byla nalezena !
+Polozka obsahuje hodnotu 6 
+[TEST23]
+Pokusime se vyhledat polozky s klici 'A', 'B'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Polozka nebyla nalezena !
+Polozka nebyla nalezena !
+[TEST24]
+Pridame vhodne jeste dalsi prvky 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Struktura binarniho stromu:
+
+                       +-[J,10]
+                       |
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+     |
+     |  +-[B,2]
+     |  |
+     +-[A,1]
+
+=================================================
+[TEST25]
+Zrusime uzel (A,1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Struktura binarniho stromu:
+
+                       +-[J,10]
+                       |
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+     |
+     +-[B,2]
+
+=================================================
+[TEST26]
+Zrusime uzel (B,2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Struktura binarniho stromu:
+
+                       +-[J,10]
+                       |
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+
+=================================================
+[TEST27]
+Zrusime uzel (J,10)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Struktura binarniho stromu:
+
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+
+=================================================
+[TEST28]
+Pokusime se zrusit uzel, ktery neexistuje (U,?)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Struktura binarniho stromu:
+
+                    +-[I,9]
+                    |
+                 +-[H,8]
+                 |
+              +-[G,7]
+              |
+           +-[F,6]
+           |
+        +-[E,5]
+        |
+     +-[D,4]
+     |
+  +-[C,3]
+
+=================================================
+[TEST29]
+Nakonec zrusime cely strom
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Struktura binarniho stromu:
+
+strom je prazdny
+
+=================================================
+[TEST30]
 Nakonec zrusime cely strom
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Struktura binarniho stromu:

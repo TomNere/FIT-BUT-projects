@@ -80,7 +80,7 @@ void SInitP (tStackP *S)
 	S->top = 0;  
 }	
 
-void SPushP (tStackP *S, tBTNodePtr ptr)
+void SPushP (tStackP *S, tBTNodePtr tmp)
 /*   ------
 ** Vloží hodnotu na vrchol zásobníku.
 **/
@@ -90,7 +90,7 @@ void SPushP (tStackP *S, tBTNodePtr ptr)
     printf("Chyba: Došlo k přetečení zásobníku s ukazateli!\n");
   else {  
 		S->top++;  
-		S->a[S->top]=ptr;
+		S->a[S->top]=tmp;
 	}
 }	
 
@@ -181,9 +181,8 @@ void BTInit (tBTNodePtr *RootPtr)	{
 ** Všimněte si, že zde se poprvé v hlavičce objevuje typ ukazatel na ukazatel,	
 ** proto je třeba při práci s RootPtr použít dereferenční operátor *.
 **/
+	//root points to NULL at the start
 	*RootPtr = NULL;
-	
-	 //solved = FALSE;		  /* V případě řešení smažte tento řádek! */	
 }
 
 void BTInsert (tBTNodePtr *RootPtr, int Content) {
@@ -196,36 +195,46 @@ void BTInsert (tBTNodePtr *RootPtr, int Content) {
 ** se ve stromu může vyskytnout nejvýše jednou). Pokud se vytváří nový uzel,
 ** vzniká vždy jako list stromu. Funkci implementujte nerekurzivně.
 **/
+	//allocate new node
 	if (*RootPtr == NULL) {
 		*RootPtr = malloc(sizeof(struct tBTNode));
 		(*RootPtr)->Cont = Content;
+		//new root has no subtrees
 		(*RootPtr)->LPtr = NULL;
 		(*RootPtr)->RPtr = NULL;
 	}
 	else {
+		//this will be new node
 		tBTNodePtr tmp = *RootPtr;
 		while (TRUE) {
 			if (Content < tmp->Cont) {
+				//allocate new node
 				if (tmp->LPtr == NULL) {
 					tmp->LPtr = malloc(sizeof(struct tBTNode));
 					tmp->LPtr->Cont = Content;
+					//new root has no subtrees
 					tmp->LPtr->LPtr = NULL; 
 					tmp->LPtr->RPtr = NULL;
 					return;
 				}
+				//go to left subtree
 				tmp = tmp->LPtr;
 			}
 			else if (Content > tmp->Cont) {
+				//allocate new node
 				if (tmp->RPtr == NULL) {
 					tmp->RPtr = malloc(sizeof(struct tBTNode));
 					tmp->RPtr->Cont = Content;
+					//new root has no subtrees
 					tmp->RPtr->LPtr = NULL; 
 					tmp->RPtr->RPtr = NULL;
 					return;
 				}
+				//go to right subtree
 				tmp = tmp->RPtr;
 			}
 			else {
+				//do nothing if node exists
 				return;
 			}
 		}
@@ -241,11 +250,15 @@ void Leftmost_Preorder (tBTNodePtr ptr, tStackP *Stack)	{
 ** Při průchodu Preorder navštívené uzly zpracujeme voláním funkce BTWorkOut()
 ** a ukazatele na ně is uložíme do zásobníku.
 **/
+	//helping pointer
 	tBTNodePtr tmp = ptr;
 
 	while (tmp != NULL) {
+		//push pointer to node to stack
 		SPushP(Stack, tmp);
+		//do stuff
 		BTWorkOut(tmp);
+		//go to left subtree
 		tmp = tmp->LPtr;
 	}	
 }
@@ -256,14 +269,20 @@ void BTPreorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Preorder a zásobníku ukazatelů. Zpracování jednoho uzlu stromu
 ** realizujte jako volání funkce BTWorkOut(). 
 **/
+	//create stack
 	tStackP stack;
 	SInitP(&stack);
+	//go to most left node(node will be worked out)
 	Leftmost_Preorder(RootPtr, &stack);
 
+	//helping pointer
 	tBTNodePtr tmp = RootPtr;
 
+	//clean stack
 	while (!SEmptyP(&stack)) {
+		//pop node
 		tmp = STopPopP(&stack);
+		//go to most left node in all subtrees(cycle)(node will be worked out)
 		Leftmost_Preorder(tmp->RPtr, &stack);
 	}
 }
@@ -278,10 +297,13 @@ void Leftmost_Inorder(tBTNodePtr ptr, tStackP *Stack)		{
 ** Při průchodu Inorder ukládáme ukazatele na všechny navštívené uzly do
 ** zásobníku. 
 **/
+	//helping pointer
 	tBTNodePtr tmp = ptr;
 
 	while (tmp != NULL) {
+		//push pointer to node to stack
 		SPushP(Stack, tmp);
+		//go to left subtree
 		tmp = tmp->LPtr;
 	}
 }
@@ -292,16 +314,23 @@ void BTInorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Inorder a zásobníku ukazatelů. Zpracování jednoho uzlu stromu
 ** realizujte jako volání funkce BTWorkOut(). 
 **/
+	//create stack
 	tStackP stack;
 	SInitP(&stack);
 
+	//go to most left node(node will not be worked out)
 	Leftmost_Inorder(RootPtr, &stack);
 
+	//helping pointer
 	tBTNodePtr tmp = RootPtr;
 
+	//clean stack
 	while (!SEmptyP(&stack)) {
+		//pop node
 		tmp = STopPopP(&stack);
+		//go to most left node in all subtrees (cycle)
 		Leftmost_Inorder(tmp->RPtr, &stack);
+		//do stuff 
 		BTWorkOut(tmp);
 	}
 }
@@ -316,11 +345,15 @@ void Leftmost_Postorder (tBTNodePtr ptr, tStackP *StackP, tStackB *StackB) {
 ** a současně do zásobníku bool hodnot ukládáme informaci, zda byl uzel
 ** navštíven poprvé a že se tedy ještě nemá zpracovávat. 
 **/
+	//helping pointer
 	tBTNodePtr tmp = ptr;
 
 	while (tmp != NULL) {
+		//push pointer to stack
 		SPushP(StackP, tmp);
+		//push flag to stack
 		SPushB(StackB, TRUE);
+		//go to left subtree
 		tmp = tmp->LPtr;
 	}
 }
@@ -331,29 +364,41 @@ void BTPostorder (tBTNodePtr RootPtr)	{
 ** Leftmost_Postorder, zásobníku ukazatelů a zásobníku hotdnot typu bool.
 ** Zpracování jednoho uzlu stromu realizujte jako volání funkce BTWorkOut(). 
 **/
+	//flag
 	bool leftFlag;
 
+	//create stacks
 	tStackP stackP;
 	tStackB stackB;
-
 	SInitP(&stackP);
 	SInitB(&stackB);
 
+	//helping pointer
 	tBTNodePtr tmp = RootPtr;
 
+	//go to most left node(stacks will be fullfiled)
 	Leftmost_Postorder(tmp, &stackP, &stackB);
 
+	//clean stakc
 	while (!SEmptyP(&stackP)) {
+		//have to pop pointer from stack to get pointer
 		tmp = STopPopP(&stackP);
+		//push back to stack
 		SPushP(&stackP, tmp);
+		//get flag from stack
 		leftFlag = STopPopB(&stackB);
 
+		//if flag is TRUE
 		if (leftFlag) {
+			//push FALSE flag
 			SPushB (&stackB, FALSE);
+			//got to most left node in all subtrees(cycle)
 			Leftmost_Postorder(tmp->RPtr, &stackP, &stackB);
 		}
 		else {
+			//pop pointer
 			STopPopP(&stackP);
+			//do stuff
 			BTWorkOut(tmp);
 		}
 	}
@@ -366,22 +411,30 @@ void BTDisposeTree (tBTNodePtr *RootPtr)	{
 **
 ** Funkci implementujte nerekurzivně s využitím zásobníku ukazatelů.
 **/
+	//create stack
 	tStackP stack;
 	SInitP(&stack);
 
+	//helping pointer
 	tBTNodePtr tmp;
 
+	//do until RootPtr isn't NULL and stack isn't empty
 	do {
 		if (*RootPtr == NULL) {
+			//if RootPtr is NULL, clean stack
 			if (!SEmptyP(&stack)) {
+				//store pointer to RootPtr and also pop from stack
 				*RootPtr = STopPopP(&stack);
 			}
 		}
 		else {
 			if ((*RootPtr)->RPtr != NULL) {
+				//push pointer to right subtree to stack
 				SPushP(&stack, (*RootPtr)->RPtr);
 			}
+			//free Root node
 			tmp = *RootPtr;
+			//new Root will be root of left subtree
 			*RootPtr = (*RootPtr)->LPtr;
 			free(tmp);
 		}

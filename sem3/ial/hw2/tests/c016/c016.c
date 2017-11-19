@@ -68,8 +68,9 @@ int hashCode ( tKey key ) {
 */
 
 void htInit ( tHTable* ptrht ) {
+	//all items in table are pointing to NULL at the start
 	for (int i = 0; i < MAX_HTSIZE; i++) {
-		(*ptrht)[i] = NULL; 
+		(*ptrht)[i] = NULL;
 	}
 }
 
@@ -81,15 +82,18 @@ void htInit ( tHTable* ptrht ) {
 */
 
 tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
-	//int i = hashCode(key);
+	//find hashcode
 	tHTItem* ptr = (*ptrht)[hashCode(key)];
 
+	//search in synonym list
 	while (ptr != NULL) {
 		if (!strcmp(ptr->key, key)) {
+			//return ptr, if key is found
 			return ptr;
 		}
 		ptr = ptr->ptrnext;
 	}
+	//return NULL if not found
 	return NULL;
 }
 
@@ -106,15 +110,20 @@ tHTItem* htSearch ( tHTable* ptrht, tKey key ) {
 **/
 
 void htInsert ( tHTable* ptrht, tKey key, tData data ) {
-	tHTItem* ptr = NULL;
+	//this will be pointer to new item
+	tHTItem* ptr;
 
 	if ((ptr = htSearch(ptrht, key)) != NULL) {
+		//if key exists, rewrite data
 		ptr->data = data;
 	}
 	else {
+		//create new item
 		ptr = malloc (sizeof(tHTItem));
+		//new item will be firt in synonym list
 		ptr->ptrnext = (*ptrht)[hashCode(key)];
 		(*ptrht)[hashCode(key)] = ptr;
+		//assign key and data
 		ptr->key = key;
 		ptr->data = data;
 	}
@@ -130,11 +139,15 @@ void htInsert ( tHTable* ptrht, tKey key, tData data ) {
 */
 
 tData* htRead ( tHTable* ptrht, tKey key ) {
+	//tmp pointer
 	tHTItem* ptr;
+
 	if ((ptr = htSearch(ptrht, key)) != NULL) {
+		//return pointer to data if found
 		return &(ptr->data);
 	}
 	else {
+		//else return NULL
 		return NULL;
 	}
 }
@@ -150,11 +163,15 @@ tData* htRead ( tHTable* ptrht, tKey key ) {
 */
 
 void htDelete ( tHTable* ptrht, tKey key ) {
+	//store hachcode to variable
 	int i = hashCode(key);
+
+	//helping variables
 	tHTItem* ptr = (*ptrht)[i];
 	tHTItem* tmp;
 
 	if (ptr != NULL) {
+		//if item is FIRST
 		if (!strcmp(ptr->key, key)) {
 			tmp = ptr->ptrnext;
 			free(ptr);
@@ -162,12 +179,15 @@ void htDelete ( tHTable* ptrht, tKey key ) {
 			return;
 		}
 		while (ptr->ptrnext != NULL) {
-			if (ptr->ptrnext->key == key) {
+			//if item isn't first
+			if (!strcmp(ptr->ptrnext->key, key)) {
 				tmp = ptr->ptrnext;
 				ptr->ptrnext = ptr->ptrnext->ptrnext;
 				free(tmp);
 				tmp = NULL;
+				return;
 			}
+			//move to the next item in synonym list
 			ptr = ptr->ptrnext;
 		}
 	}
@@ -179,10 +199,12 @@ void htDelete ( tHTable* ptrht, tKey key ) {
 */
 
 void htClearAll ( tHTable* ptrht ) {
+	//helping variable
 	tHTItem* ptr;
+	//clean all items in table
 	for (int i = 0; i < MAX_HTSIZE; i++) {
 		if ((*ptrht)[i] != NULL) {
-
+			//clean all items in synonym list
 			while ((*ptrht)[i] != NULL) {
 				ptr = (*ptrht)[i];
 				(*ptrht)[i] = ptr->ptrnext;
