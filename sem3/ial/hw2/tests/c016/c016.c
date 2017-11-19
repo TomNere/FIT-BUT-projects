@@ -69,7 +69,7 @@ int hashCode ( tKey key ) {
 
 void htInit ( tHTable* ptrht ) {
 	//all items in table are pointing to NULL at the start
-	for (int i = 0; i < MAX_HTSIZE; i++) {
+	for (int i = 0; i < HTSIZE; i++) {
 		(*ptrht)[i] = NULL;
 	}
 }
@@ -202,7 +202,7 @@ void htClearAll ( tHTable* ptrht ) {
 	//helping variable
 	tHTItem* ptr;
 	//clean all items in table
-	for (int i = 0; i < MAX_HTSIZE; i++) {
+	for (int i = 0; i < HTSIZE; i++) {
 		if ((*ptrht)[i] != NULL) {
 			//clean all items in synonym list
 			while ((*ptrht)[i] != NULL) {
