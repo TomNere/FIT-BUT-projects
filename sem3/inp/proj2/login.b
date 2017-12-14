@@ -1,19 +1,19 @@
-XNEREC00
-88 78 69 82 69 67 48 48
-
-++++ ++++ ++       initialize cell to value 10
-[                  cycle to initialize cells
-  > ++++ ++++ +    add 9 to cell 1 final = 90
-  > ++++ ++++      add 8 to cell 2 final = 80
-  > ++++ +++       add 7 to cell 3 final = 70
-  > ++++ +         add 5 to cell 4 final = 50
-  <<<< -           back to previous cell and dec
++++++ +++++        bunku cislo 0 inicializovat na 10
+[                  pouzit cyklus pro inicializaci nasledujicich tri bunek na 130/100/50
+ > +++++ +++++ +++ pricist 13 k bunce cislo 1
+ > +++++ +++++     pricist 10 k bunce cislo 2
+ > +++++           pricist 5 k bunce cislo 3
+ <<< -             vratit se a dekrementovat hodnotu bunky cislo 0
 ]
+>[----------.~ tisk znaku "x"]
+>[++++++++.~   tisk znaku "l"]
+[+++.~         tisk znaku "o"]
+[--------.~    tisk znaku "g"]
+++.            tisk znaku "i"
++++++.         tisk znaku "n"
+>--.           tisk znaku "0"
++.             tisk znaku "1"
 
->[--.~   print "X"]
->[--.~   print "N"]
->[-.~    print "E"]
-<[++++.~ print "R"]
->.       print "E"
---.      print "C"
->--..    print "0" two times
+
+Tento kod lze tak jak jej vidite tj vcetne komentaru odsmimulovat 
+pomoci debuggeru na adrese http://www TECKA fit TECKA vutbr TECKA cz/ VLNOVKA vasicek/inp17/

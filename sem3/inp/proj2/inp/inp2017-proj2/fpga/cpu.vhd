@@ -49,10 +49,100 @@ end cpu;
 architecture behavioral of cpu is
 
  -- zde dopiste potrebne deklarace signalu
+signal pc_reg : std_logic_vector(15 downto 0);
+signal pc_ld  : std_logic;
+signal pc_inc : std_logic;
 
+---------------------------------------
+-- Instruction
+type instruction_type is (
+   pointer_inc, pointer_dec,
+   value_inc, value_dec,
+   while_begin, while_end,
+   value_print, value_read,
+   break, terminate,
+   nothing
+);
+signal instruction : instruction_type;
+------------------------------------------
 begin
 
  -- zde dopiste vlastni VHDL kod
+
+--Program counter PC
+
+pc_cntr: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      pc_reg <= (others=>'0');
+   elsif(CLK'event) and (CLK='1') then
+      if (pc_ld='1') then
+         pc_reg <= pc_mx;
+      elsif(pc_inc='1') then
+         pc_reg <= pc_reg + 1;
+      end if;
+   end if;
+end process;
+
+--CNT register
+
+cntr: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      pc_reg <= (others=>'0');
+   elsif(CLK'event) and (CLK='1') then
+      if (pc_ld='1') then
+         pc_reg <= pc_mx;
+      elsif(pc_inc='1') then
+         pc_reg <= pc_reg + 1;
+      end if;
+   end if;
+end process;
+
+--Instruction register IREG
+
+ireg: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      ireg_reg <= ( others =>'0');
+   elsif (CLK'event) and (CLK='1') then
+      if (ireg_ld='1') then
+         ireg_reg <= DBUS;
+      end if;
+   end if;
+end process;
+
+--Indirect address register IAR
+
+ireg: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      ireg_reg <= ( others =>'0');
+   elsif (CLK'event) and (CLK='1') then
+      if (ireg_ld='1') then
+         ireg_reg <= DBUS;
+      end if;
+   end if;
+end process;
+
+--------------------------------------
+-- Instruction decoder
+instr_decoder: process (DATA_RDATA)
+begin
+   case (DATA_RDATA) is
+      when X"3E"  => instruction <= pointer_inc; 
+      when X"3C"  => instruction <= pointer_dec; 
+      when X"2B"  => instruction <= value_inc; 
+      when X"2D"  => instruction <= value_dec; 
+      when X"5B"  => instruction <= while_begin;
+      when X"5D"  => instruction <= while_end;
+      when X"2E"  => instruction <= value_print; 
+      when X"2C"  => instruction <= value_read;
+      when X"7E"  => instruction <= break; 
+      when X"00"  => instruction <= terminate;
+      when others => instruction <= nothing; 
+   end case;
+end process;
 
 end behavioral;
  
