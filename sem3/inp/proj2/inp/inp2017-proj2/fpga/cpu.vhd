@@ -50,8 +50,16 @@ architecture behavioral of cpu is
 
  -- zde dopiste potrebne deklarace signalu
 signal pc_reg : std_logic_vector(15 downto 0);
-signal pc_ld  : std_logic;
+signal pc_dec : std_logic;
 signal pc_inc : std_logic;
+
+signal ptr_reg : std_logic_vector(15 downto 0);
+signal ptr_dec : std_logic;
+signal ptr_inc : std_logic;
+
+signal ptr_reg : std_logic_vector(15 downto 0);
+signal ptr_dec : std_logic;
+signal ptr_inc : std_logic;
 
 ---------------------------------------
 -- Instruction
@@ -67,63 +75,66 @@ signal instruction : instruction_type;
 ------------------------------------------
 begin
 
- -- zde dopiste vlastni VHDL kod
-
---Program counter PC
-
-pc_cntr: process (RESET, CLK)
+------------------------------------
+-- PC register - program counter
+pc_reg: process (RESET, CLK)
 begin
-   if (RESET='1') then
-      pc_reg <= (others=>'0');
-   elsif(CLK'event) and (CLK='1') then
-      if (pc_ld='1') then
-         pc_reg <= pc_mx;
-      elsif(pc_inc='1') then
+   if (RESET = '1') then
+      pc_reg <= (others => '0');
+   elsif(CLK'event) and (CLK = '1') then
+      if (pc_dec = '1') then
+         pc_reg <= pc_reg - 1;
+      elsif(pc_inc = '1') then
          pc_reg <= pc_reg + 1;
       end if;
    end if;
 end process;
 
---CNT register
+CODE_ADDR <= pc_reg;
 
-cntr: process (RESET, CLK)
+-------------------------------------
+-- PTR register - pointer to data
+ptr_reg: process (RESET, CLK)
 begin
-   if (RESET='1') then
-      pc_reg <= (others=>'0');
-   elsif(CLK'event) and (CLK='1') then
-      if (pc_ld='1') then
-         pc_reg <= pc_mx;
-      elsif(pc_inc='1') then
-         pc_reg <= pc_reg + 1;
+   if (RESET = '1') then
+      ptr_reg <= (others => '0');
+   elsif(CLK'event) and (CLK = '1') then
+      if (ptr_dec = '1') then
+         ptr_reg <= ptr_reg - 1;
+      elsif(ptr_inc = '1') then
+         ptr_reg <= ptr_reg + 1;
       end if;
    end if;
 end process;
 
---Instruction register IREG
+DATA_ADDR <= ptr_reg;
 
-ireg: process (RESET, CLK)
+-------------------------------------
+-- CNT register - while counter
+cnt_reg: process (RESET, CLK)
 begin
-   if (RESET='1') then
-      ireg_reg <= ( others =>'0');
-   elsif (CLK'event) and (CLK='1') then
-      if (ireg_ld='1') then
-         ireg_reg <= DBUS;
+   if (RESET = '1') then
+      cnt_reg <= (others => '0');
+   elsif(CLK'event) and (CLK = '1') then
+      if (cnt_dec = '1') then
+         cnt_reg <= cnt_reg - 1;
+      elsif(cnt_inc = '1') then
+         cnt_reg <= cnt_reg + 1;
       end if;
    end if;
 end process;
 
---Indirect address register IAR
+DATA_ADDR <= ptr_data;
 
-ireg: process (RESET, CLK)
-begin
-   if (RESET='1') then
-      ireg_reg <= ( others =>'0');
-   elsif (CLK'event) and (CLK='1') then
-      if (ireg_ld='1') then
-         ireg_reg <= DBUS;
-      end if;
-   end if;
-end process;
+-- Multiplexer
+with sel select
+   DATA_WDATA <= IN_DATA when "00",
+               data_rdata_plus when "01",
+               data_rdata_minus when "10",
+               (others => '0') when others;
+
+cnt_data_aux <= '1' when (cnt_data = "00000000") else '0';
+data_rdata_aux <= '1' when (DATA_RDATA = "00000000") else '0';
 
 --------------------------------------
 -- Instruction decoder
