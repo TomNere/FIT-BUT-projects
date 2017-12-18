@@ -61,8 +61,22 @@ signal ptr_reg : std_logic_vector(15 downto 0);
 signal ptr_dec : std_logic;
 signal ptr_inc : std_logic;
 
+type fsm_state  is (
+idle_state, fetch_state, decode_state,
+pointer_inc_state, pointer_dec_state,
+value_inc_state, value_dec_state,
+while_begin_state, while_end_state,
+value_print_state, value_read_state,
+break_state, terminate_state,
+nothing_state
+);
+signal
+pstate : fsm_state;
+signal
+nstate : fsm_state;
+
 ---------------------------------------
--- Instruction
+-- Instructions
 type instruction_type is (
    pointer_inc, pointer_dec,
    value_inc, value_dec,
@@ -154,6 +168,85 @@ begin
       when others => instruction <= nothing; 
    end case;
 end process;
+
+--------------------------------
+-- FSM present state
+fsm_pstate:  process (RESET, CLK)
+begin
+   if (RESET = '1') then
+      pstate <= sidle;
+   elsif (CLK'event) and (CLK = '1') then
+      if (CE = '1') then
+         pstate <= nstate;
+      end if;
+   end if;
+end process;
+
+fsm_nstate : process()
+begin
+   ----------Default----------
+   DATA_EN <= '0';
+   DATA_RDWR <= '0';
+   sel2 <= "11";
+   pc_inc <= '0';
+   pc_dec <= '0';
+   ptr_inc <= '0';
+   ptr_dec <= '0';
+   cnt_inc <= '0';
+   cnt_dec <= '0';
+   IN_REQ <= '0';
+   OUT_WE <= '0';
+   
+   case pstate is
+      ---------idle_state----------
+      when sidle => nstate <= sfetch;
+
+      ---------fetch_state---------
+      when sfetch => 
+         nstate <= sdecode;
+         DATA_EN <= '1';
+         sel1 <= '1';
+
+      ---------decode_state--------
+      when decode_state =>
+         case instruction is
+            when pointer_inc => nstate <= pointer_inc_state;
+            when pointer_dec => nstate <= pointer_dec_state;
+            when value_inc   => nstate <= value_inc_state;
+            when value_dec   => nstate <= value_inc_state;
+            when while_begin => nstate <= while_begin_state;
+            when while_end   => nstate <= while_end_state;
+            when value_print => nstate <= value_print_state;
+            when value_read  => nstate <= value_read_state;
+            when break       => nstate <= break_state;
+            when terminate   => nstate <= terminate_state;
+            when others      => nstate <= nothing_state;
+         end case;
+
+      ------------pointer_inc_state----------
+      when pointer_inc_state =>
+      when pointer_inc_state =>
+      when pointer_dec_state =>
+      when value_inc_state =>
+      when value_inc_state =>
+      when while_begin_state =>
+      when while_end_state =>
+      when value_print_state =>
+      when value_read_state =>
+      when break_state =>
+      when terminate_state =>
+      when nothing_state =>
+      ------------pointer_dec_state----------
+      ------------value_inc_state----------
+      ------------value_dec_state----------
+      ------------while_begin_state----------
+      ------------while_end_state----------
+      ------------value_print_state----------
+      ------------value_read_state----------
+      ------------break_state----------
+      ------------terminate_state----------
+      ------------nothing_state----------
+      
 
 end behavioral;
  
