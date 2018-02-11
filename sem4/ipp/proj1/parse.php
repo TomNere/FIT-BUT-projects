@@ -4,21 +4,24 @@
 /**
 * This class represents instruction
 */
+/*
 class Instruction {
     public $name;
     public $params;
 }
+*/
 
 const ARG_ERR = 10;
 
 /********************ARRAYS FOR INSTRUCTIONS*****************/
-
+/*
 $help_arr = array(
     "inst_0" => 0,
     "inst_1" => 1,
     "inst_2" => 2,
     "inst_3" => 3
 );
+*/
 
 /**
 * All instructions 
@@ -70,6 +73,7 @@ $all_inst = array(
     "jumpifneq" => array(2, 3, 3)
 );
 
+/*
 // Zero parameter instructions
 $inst_0 = array("createframe", "pushframe", "popframe", "return", "break");
 
@@ -81,15 +85,18 @@ $inst_2 = array("move", "int2char", "read", "strlen", "type");
 
 // Three parameter instructions
 $inst_3 = array("add", "sub", "mul", "idiv", "lt", "gt", "eq", "and", "or", "not", "stri2int", "concat", "getchar", "setchar", "jumpifeq", "jumpifneq");
+*/
 
 /*********************FUNCTION DEFS************************/
 
 function getInst() {
-    global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
+    //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
+    global $all_inst;
 
-    $inst = new Instruction();
-    $inst->name = strtolower(stream_get_line(STDIN, 20, " "));
+    //$inst = new Instruction();
+    $op_code = strtolower(stream_get_line(STDIN, 20, " "));
 
+    /*
     foreach ($help_arr as $arr_name => $number) {
         foreach ($$arr_name as $value) {
             if ($value == $inst->name) {
@@ -98,8 +105,15 @@ function getInst() {
             }
         }
     }
-    $inst->params = -1;
-    return $inst;
+    */
+
+    foreach ($all_inst as $key => $value) {
+        if (strcmp($key, $op_code) == 0) {
+            return $op_code;
+        }
+    }
+
+    return "unknown";
 }
 
 function main() {
@@ -130,6 +144,9 @@ function main() {
     // Repeat until error or EOF
     while ( true ) {
         $var = getInst();
+
+        print $var;
+        break;
         //print $var->name;
         //print $var->params;
     }
