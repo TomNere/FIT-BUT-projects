@@ -89,22 +89,31 @@ $inst_3 = array("add", "sub", "mul", "idiv", "lt", "gt", "eq", "and", "or", "not
 
 /*********************FUNCTION DEFS************************/
 
+/*
 // Skip comments
 function skipComment() {
-
+    while (true) {
+        fe
+    }
 }
+*/
 
 // Skip white characters
 function skipWhite() {
     $char;
     while (true) {
-        $char = fgetc(STDIN);
-        if ($char == '#') {
-            skipComment();
-            return '#';
+        if (feof(STDIN)) {
+            return -1;
         }
-        else if ($char == EOF) {
-            return EOF;
+
+        $char = fgetc(STDIN);
+
+        if ($char == '#') {
+            fgets(STDIN);
+            continue;
+        }
+        else if ($char == '\n') {
+            return '\n';
         }
         else if (ctype_space($char)) {
             continue;
@@ -116,11 +125,17 @@ function skipWhite() {
 }
 
 function getInst() {
+    $op_code = skipWhite();
+
+    if ($op_code == -1) {
+        return "eof";
+    }
+
     //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
     global $all_inst;
 
     //$inst = new Instruction();
-    $op_code = strtolower(stream_get_line(STDIN, 20, " "));
+    $op_code = $op_code.strtolower(stream_get_line(STDIN, 20, " "));
 
     /*
     foreach ($help_arr as $arr_name => $number) {
@@ -142,6 +157,21 @@ function getInst() {
     return "unknown";
 }
 
+function getLabel() {
+
+}
+function getSymb() {
+    
+}
+
+function getVar() {
+    
+}
+
+function getType() {
+    
+}
+
 function main() {
 
     // Arguments check
@@ -161,18 +191,36 @@ function main() {
     }
     
     // First line check
-    $first_line = rtrim(strtolower(fgets(STDIN)));
+    $char = skipWhite();
+    $first_line = $char.rtrim(strtolower(fgets(STDIN)));
     if (strcmp($first_line, ".ippcode18") != 0) {
         fwrite(STDERR, ".IPPcode18 is missing!\n");
         return 21;
     }
-    
+    /*
+    $char = skipWhite();
+    if ($char == -1) {
+        return 0;
+    }
+    else if ($char != '\n') {
+        print $char;
+        fwrite(STDERR, ".IPPcode18 wrong!\n");
+        return 21;
+    }
+    */
     // Repeat until error or EOF
-    while ( true ) {
+    while (true) {
         $var = getInst();
 
-        print $var;
-        break;
+        if (strcmp($var, "eof")) {
+            break;
+        }
+
+        foreach ({$all_inst[$var]} as $key => $value) {
+            
+        }
+
+        //print $var;
         //print $var->name;
         //print $var->params;
     }
