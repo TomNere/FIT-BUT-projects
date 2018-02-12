@@ -157,19 +157,19 @@ function getInst() {
     return "unknown";
 }
 
-function getLabel() {
+function getLabel($end) {
 
 }
-function getSymb() {
+function getSymb($end) {
     
 }
 
-function getVar() {
+function getVar($end) {
     
 }
 
-function getType() {
-    
+function getType($end) {
+
 }
 
 function main() {
@@ -215,9 +215,30 @@ function main() {
         if (strcmp($var, "eof")) {
             break;
         }
-
+        $end;
         foreach ({$all_inst[$var]} as $key => $value) {
-            
+            if count({$all_inst[$var]} == ($key + 1)) 
+                $end = true;
+            else
+                $end = false;
+
+            switch ($value) {
+                case 1:
+                    getVar($end);
+                    break;
+                case 2:
+                    getLabel($end);
+                    break;
+                case 3:
+                    getSymb($end);
+                    break;
+                case 4:
+                    getType($end);
+                    break;
+                default:
+                    // WTF
+                    break;
+            }
         }
 
         //print $var;
