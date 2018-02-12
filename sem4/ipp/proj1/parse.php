@@ -89,6 +89,32 @@ $inst_3 = array("add", "sub", "mul", "idiv", "lt", "gt", "eq", "and", "or", "not
 
 /*********************FUNCTION DEFS************************/
 
+// Skip comments
+function skipComment() {
+
+}
+
+// Skip white characters
+function skipWhite() {
+    $char;
+    while (true) {
+        $char = fgetc(STDIN);
+        if ($char == '#') {
+            skipComment();
+            return '#';
+        }
+        else if ($char == EOF) {
+            return EOF;
+        }
+        else if (ctype_space($char)) {
+            continue;
+        }
+        else {
+            return $char;
+        }
+    }
+}
+
 function getInst() {
     //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
     global $all_inst;
