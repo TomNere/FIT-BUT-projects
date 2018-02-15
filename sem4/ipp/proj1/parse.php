@@ -164,10 +164,11 @@ function getSymb($end) {
     
 }
 
-function getVar($end) {
+// First part of variable name
+function getFrame() {
     $str = skipWhite();
 
-    // LF TF or GF
+    // LF, TF or GF
     if ($str == 'L' || $str == 'T' || $str == 'G') {
         $tmp = fgetc(STDIN);
         if ($tmp == 'F') {
@@ -185,7 +186,16 @@ function getVar($end) {
     if (($tmp = fgetc(STDIN)) != '@') {
         return "error";
     }
-    $str.=$tmp;
+    return $str."@";
+}
+
+// Variable or label
+function getVarLab($end, $is_var) {
+    
+    if ($is_var == true)
+        $str = getFrame();
+    else 
+        $str = "";
 
     // Must start with alpha or special
     $tmp = fgetc(STDIN);
@@ -296,10 +306,10 @@ function main() {
 
             switch ($value) {
                 case 1:
-                    getVar($end);
+                    getVarLab($end, true);
                     break;
                 case 2:
-                    getLabel($end);
+                    getVarLab($end, false);
                     break;
                 case 3:
                     getSymb($end);
