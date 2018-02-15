@@ -168,8 +168,32 @@ function getVar($end) {
     
 }
 
-function getType($end) {
 
+function getType($end) {
+    $str = skipWhite();
+    while (true) {
+        $c = fgetc(STDIN);
+
+        if (ctype_alpha($c)) {
+            $str.=$c;
+            continue;    
+        }
+        if ($c == ' ' || $c == '\t') {
+            break;
+        }
+        if ($c == '\n' && $end == true) {
+            break;
+        }
+        else {
+            return "error";
+        }
+    }
+    if (strcmp($str, "int") == 0 || strcmp($str, "string") == 0 || strcmp($str, "bool") == 0) {
+        return $str;
+    }
+    else {
+        return "error";
+    }
 }
 
 function main() {
