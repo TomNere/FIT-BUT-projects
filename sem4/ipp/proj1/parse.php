@@ -157,11 +157,74 @@ function getInst() {
     return "unknown";
 }
 
-function getLabel($end) {
+// Read int constant
+function getInt() {
+    $c = fgetc(STDIN);
 
+    if (is_numeric($c) || $c == '+' || $c == '-') {
+        
+    }
 }
-function getSymb($end) {
+
+// Constant or variable
+function getSymb($end, $str) {
+    $str = skipWhite();
+
+    if ($str == 'L' || $str == 'T' || $str == 'G') {
+        $tmp = fgetc(STDIN);
+        if ($tmp == 'F') {
+            $str.=$tmp;
+        }
+        else {
+            return "error";
+        }
+
+        if (($tmp = fgetc(STDIN)) != '@') {
+            return "error";
+        }
+        else {
+            $str.="@";
+            $tmp = getVarLab($end, false);
+            return $str.$tmp;         
+        }
+    }
     
+    if (ctype_lower($str)) {
+        $tmp;
+        while ($tmp = fgetc(STDIN)) {
+            if (ctype_lower($tmp)) {
+                $str.$tmp;
+            }
+            else {
+                break;
+            }
+        }
+        if (strcmp($str, "int") == 0 && $tmp == '@') == 0) {
+            getInt();
+        }
+        if (strcmp($str, "string") == 0 && $tmp == '@') {
+            getString();
+        }
+        if (strcmp($str, "bool") == 0 && $tmp == '@')
+            $str.='@';
+            $tmp = "";
+            while ($c = fgetc(STDIN)) {
+                if (ctype_lower($c)) {
+                    $tmp.$c;
+                }
+                else {
+                    break;
+                }
+            }
+            if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0) {
+                return $str.$tmp;
+            }
+        }
+    }
+
+    // @ check
+    
+
 }
 
 // First part of variable name
@@ -196,6 +259,10 @@ function getVarLab($end, $is_var) {
         $str = getFrame();
     else 
         $str = "";
+
+    if (strcmp($str, "error") == 0) {
+        return "error";
+    }
 
     // Must start with alpha or special
     $tmp = fgetc(STDIN);
@@ -312,6 +379,8 @@ function main() {
                     getVarLab($end, false);
                     break;
                 case 3:
+                    $c = skipWhite();
+                    if ()
                     getSymb($end);
                     break;
                 case 4:
