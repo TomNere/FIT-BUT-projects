@@ -165,7 +165,55 @@ function getSymb($end) {
 }
 
 function getVar($end) {
-    
+    $str = skipWhite();
+
+    // LF TF or GF
+    if ($str == 'L' || $str == 'T' || $str == 'G') {
+        $tmp = fgetc(STDIN);
+        if ($tmp == 'F') {
+            $str.=$tmp;
+        }
+        else {
+            return "error";
+        }
+    }
+    else {
+        return "error";
+    }
+
+    // @ check
+    if (($tmp = fgetc(STDIN)) != '@') {
+        return "error";
+    }
+    $str.=$tmp;
+
+    // Must start with alpha or special
+    $tmp = fgetc(STDIN);
+    if (ctype_alpha($tmp) || $tmp == '_' || $tmp == '-' || $tmp == '$' || $tmp == '&' || $tmp == '%' || $tmp == '*') {
+        $str.=$tmp;
+    }
+    else {
+        return "error";
+    }
+
+    while (true) {
+        $tmp = fgetc(STDIN);
+
+        if (ctype_alnum($tmp) || $tmp == '_' || $tmp == '-' || $tmp == '$' || $tmp == '&' || $tmp == '%' || $tmp == '*') {
+            $str.=$tmp;
+            continue;
+        }
+        if ($c == ' ' || $c == '\t') {
+            break;
+        }
+        if ($tmp == '\n' && $end == true) {
+            break;
+        }
+        else {
+            return "error";
+        }
+    }
+    return $str;
 }
 
 
