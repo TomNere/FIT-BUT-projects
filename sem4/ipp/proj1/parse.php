@@ -157,6 +157,56 @@ function getInst() {
     return "unknown";
 }
 
+// Read Escape sequence
+function getEscape($end) {
+
+    $number = fgets(STDIN, 3);
+    // 000-999
+    if (ctype_digit($number)) {
+        if (strcmp($number, "060") == 0)
+            return "&lt";
+        else if (strcmp($number, "062") == 0)
+            return "&gt"
+        else if (strcmp($number, "038"))
+            return "&amp";
+        else 
+            return $number;
+    }
+    else
+        return "error";
+}
+
+// Read string
+function getString($end) {
+    $c;
+    $str = "";
+    while($c = fgetc(STDIN)) {
+        if (($c == '\n' && $end) || $c == ' ' || $c == '\t') {
+            break;
+        }
+        if ($c == 92) {
+            $tmp = getEscape($end);
+
+            if (strcmp($tmp, "error") != 0) {
+                $str.$tmp;
+                break;
+            }
+            else
+                return "error";
+        }
+        // Comment
+        if ($c == 35) {
+            skipComment();
+            break;
+        }
+        if (ctype_print($c)) {
+            $str.=$c;
+            continue;
+        }
+    }
+}
+
+
 // Read int constant
 function getInt($end) {
     $c = fgetc(STDIN);
