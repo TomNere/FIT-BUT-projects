@@ -158,12 +158,28 @@ function getInst() {
 }
 
 // Read int constant
-function getInt() {
+function getInt($end) {
     $c = fgetc(STDIN);
+    $number;
 
     if (is_numeric($c) || $c == '+' || $c == '-') {
-        
+        $number = $c;
     }
+    else 
+        return "error";
+
+    while ($c = fgetc(STDIN)) {
+        if (is_numeric($c)) {
+            $number.=$c;
+        }
+        else 
+            break;
+    }
+    if (($c == '\n' && $end) || $c == '\t' || $c == ' ') {
+        return $number;
+    }
+    else 
+        return "error";
 }
 
 // Constant or variable
@@ -200,7 +216,11 @@ function getSymb($end, $str) {
             }
         }
         if (strcmp($str, "int") == 0 && $tmp == '@') == 0) {
-            getInt();
+            $tmp = getInt($end);
+            if (strcmp($tmp, "error") != 0) {
+                $str.="@";
+                return $str.$tmp;
+            } 
         }
         if (strcmp($str, "string") == 0 && $tmp == '@') {
             getString();
