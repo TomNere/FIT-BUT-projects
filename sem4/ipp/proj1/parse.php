@@ -14,15 +14,6 @@ class Instruction {
 const ARG_ERR = 10;
 
 /********************ARRAYS FOR INSTRUCTIONS*****************/
-/*
-$help_arr = array(
-    "inst_0" => 0,
-    "inst_1" => 1,
-    "inst_2" => 2,
-    "inst_3" => 3
-);
-*/
-
 /**
 * All instructions 
 * KEY - operation code
@@ -31,7 +22,6 @@ $help_arr = array(
 * 2 - label
 * 3 - symb
 * 4 - type
-* 5 -
 */
 $all_inst = array(
     "createframe" => array (), 
@@ -133,7 +123,7 @@ function getEscape($end) {
         if (strcmp($number, "060") == 0)
             return "&lt";
         else if (strcmp($number, "062") == 0)
-            return "&gt"
+            return "&gt";
         else if (strcmp($number, "038"))
             return "&amp";
         else 
@@ -171,6 +161,7 @@ function getString($end) {
             continue;
         }
     }
+    return $str;
 }
 
 
@@ -200,7 +191,7 @@ function getInt($end) {
 }
 
 // Constant or variable
-function getSymb($end, $str) {
+function getSymb($end, &$type) {
     $str = skipWhite();
 
     if ($str == 'L' || $str == 'T' || $str == 'G') {
@@ -218,6 +209,7 @@ function getSymb($end, $str) {
         else {
             $str.="@";
             $tmp = getVarLab($end, false);
+            $type = 1;
             return $str.$tmp;         
         }
     }
@@ -232,15 +224,17 @@ function getSymb($end, $str) {
                 break;
             }
         }
-        if (strcmp($str, "int") == 0 && $tmp == '@') == 0) {
+        if (strcmp($str, "int") == 0 && $tmp == '@') {
             $tmp = getInt($end);
             if (strcmp($tmp, "error") != 0) {
                 $str.="@";
+                $type = 2;
                 return $str.$tmp;
             } 
         }
         if (strcmp($str, "string") == 0 && $tmp == '@') {
-            getString();
+            $type = 3;
+            return getString();
         }
         if (strcmp($str, "bool") == 0 && $tmp == '@')
             $str.='@';
@@ -254,6 +248,7 @@ function getSymb($end, $str) {
                 }
             }
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0) {
+                $type = 4;
                 return $str.$tmp;
             }
         }
@@ -262,7 +257,7 @@ function getSymb($end, $str) {
     // @ check
     
 
-}
+//}
 
 // First part of variable name
 function getFrame() {
@@ -331,7 +326,7 @@ function getVarLab($end, $is_var) {
 }
 
 
-function getType($end) {
+function getTyp($end) {
     $str = skipWhite();
     while (true) {
         $c = fgetc(STDIN);
@@ -441,11 +436,13 @@ function main() {
     */
 
     // Basic XML string
-    $xmlstr = <<<XML
+    $xml_str = <<<XML
     <?xml version="1.0" encoding="UTF-8"?>
     <program language="IPPcode18">
     </program>
 XML;
+    
+    $xml_el = new SimpleXMLElement($xml_str);
 
     // Instruction counter
     $inst_count = 0;
@@ -455,7 +452,7 @@ XML;
         $var = getInst();
 
         // End of file
-        if ($var == -1 {
+        if ($var == -1) {
             return 0;
         }
         // Unknown instruction
@@ -465,26 +462,58 @@ XML;
 
         // $end signalize last parameter
         $end;
-        foreach ({$all_inst[$var]} as $key => $value) {
-            if count({$all_inst[$var]} == ($key + 1)) 
+        $inst_count++;
+
+        //global $all_inst;
+
+        $xml_inst = $xml_el->addChild("instruction");
+        $xml_inst->addAttribute("order", $inst_count);
+        $xml_inst->addAttribute("opcode", ctype_upper($var));  
+
+        foreach ($all_inst[$var] as $key => $value) {
+            if (count($all_inst[$var]) == ($key + 1)) 
                 $end = true;
             else
                 $end = false;
 
+            $xml_arg = $xml_inst->addChild("arg".strval($key + 1));
+
             switch ($value) {
                 case 1:
-                    getVarLab($end, true);
+                    $str = getVarLab($end, true);
+                    $xml_arg.addAttribute("type", "var");
                     break;
                 case 2:
-                    getVarLab($end, false);
+                    $str = getVarLab($end, false);
+                    $xml_arg.addAttribute("type", "label");
                     break;
                 case 3:
-                    $c = skipWhite();
-                    if ()
-                    getSymb($end);
+                    //$c = skipWhite();
+                    //if ()
+                    $type;
+                    $str = getSymb($end, $type);
+                    switch ($type) {
+                        case 1:
+                            $xml_arg.addAttribute("type", "var");
+                            break;
+                        case 2:
+                            $xml_arg.addAttribute("type", "int");
+                            break;
+                        case 3:
+                            $xml_arg.addAttribute("type", "string");
+                            break;
+                        case 4:
+                            $xml_arg.addAttribute("type", "bool");
+                            break;
+                        default:
+                            // WTF
+                            break;
+                    }
+                    
                     break;
                 case 4:
-                    getType($end);
+                    $str = getType($end);
+                    $xml_arg.addAttribute("type", "type");
                     break;
                 default:
                     // WTF
