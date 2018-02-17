@@ -112,49 +112,16 @@ function skipWhite() {
             fgets(STDIN);
             continue;
         }
-        else if ($char == '\n') {
+        if ($char == '\n') {
             return '\n';
         }
-        else if (ctype_space($char)) {
+        if (ctype_space($char)) {
             continue;
         }
         else {
             return $char;
         }
     }
-}
-
-function getInst() {
-    $op_code = skipWhite();
-
-    if ($op_code == -1) {
-        return "eof";
-    }
-
-    //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
-    global $all_inst;
-
-    //$inst = new Instruction();
-    $op_code = $op_code.strtolower(stream_get_line(STDIN, 20, " "));
-
-    /*
-    foreach ($help_arr as $arr_name => $number) {
-        foreach ($$arr_name as $value) {
-            if ($value == $inst->name) {
-                $inst->params = $number;
-                return $inst;
-            }
-        }
-    }
-    */
-
-    foreach ($all_inst as $key => $value) {
-        if (strcmp($key, $op_code) == 0) {
-            return $op_code;
-        }
-    }
-
-    return "unknown";
 }
 
 // Read Escape sequence
@@ -391,13 +358,58 @@ function getType($end) {
     }
 }
 
+function getInst() {
+    $op_code = skipWhite();
+
+    while ($op_code == '\n') {
+        $op_code = skipWhite();        
+    }
+
+    if ($op_code == -1) {
+        return -1;
+    }
+
+    //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
+    global $all_inst;
+
+    //$inst = new Instruction();
+    $c;
+    while ($c = fgetc(STDIN)) {
+        if ($c == ' ' || $c == '\t')
+            break;
+        if (ctype_alnum($c))
+            $op_code.$c;
+        else 
+            return -2;
+    }
+    // Case insentive
+    $op_code = strtolower($op_code);
+
+    /*
+    foreach ($help_arr as $arr_name => $number) {
+        foreach ($$arr_name as $value) {
+            if ($value == $inst->name) {
+                $inst->params = $number;
+                return $inst;
+            }
+        }
+    }
+    */
+
+    foreach ($all_inst as $key => $value) {
+        if (strcmp($key, $op_code) == 0) {
+            return $op_code;
+        }
+    }
+
+    return -2;
+}
+
 function main() {
 
     // Arguments check
     global $argc;
     global $argv;
-
-    $inst_counter = 0;
     
     if ($argc > 1) {
         if ($argv[1] == '--help') {
@@ -427,13 +439,31 @@ function main() {
         return 21;
     }
     */
+
+    // Basic XML string
+    $xmlstr = <<<XML
+    <?xml version="1.0" encoding="UTF-8"?>
+    <program language="IPPcode18">
+    </program>
+XML;
+
+    // Instruction counter
+    $inst_count = 0;
+
     // Repeat until error or EOF
     while (true) {
         $var = getInst();
 
-        if (strcmp($var, "eof")) {
-            break;
+        // End of file
+        if ($var == -1 {
+            return 0;
         }
+        // Unknown instruction
+        if ($var == -2) {
+            return 21;
+        }
+
+        // $end signalize last parameter
         $end;
         foreach ({$all_inst[$var]} as $key => $value) {
             if count({$all_inst[$var]} == ($key + 1)) 
