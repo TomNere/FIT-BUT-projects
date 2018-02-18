@@ -12,6 +12,8 @@ class Instruction {
 */
 
 const ARG_ERR = 10;
+const EOF = -1;
+const ERR = -2;
 
 /********************ARRAYS FOR INSTRUCTIONS*****************/
 /**
@@ -70,7 +72,7 @@ function skipWhite() {
     $char;
     while (true) {
         if (feof(STDIN)) {
-            return -1;
+            return EOF;
         }
 
         $char = fgetc(STDIN);
@@ -107,7 +109,7 @@ function getEscape($end) {
             return $number;
     }
     else
-        return "error";
+        return ERR;
 }
 
 // Read string
@@ -121,12 +123,12 @@ function getString($end) {
         if ($c == 92) {
             $tmp = getEscape($end);
 
-            if (strcmp($tmp, "error") != 0) {
+            if (strcmp($tmp, ERR) != 0) {
                 $str.$tmp;
                 break;
             }
             else
-                return "error";
+                return ERR;
         }
         // Comment
         if ($c == 35) {
@@ -151,7 +153,7 @@ function getInt($end) {
         $number = $c;
     }
     else 
-        return "error";
+        return ERR;
 
     while ($c = fgetc(STDIN)) {
         if (is_numeric($c)) {
@@ -164,7 +166,7 @@ function getInt($end) {
         return $number;
     }
     else
-        return "error";
+        return ERR;
 }
 
 // Constant or variable
@@ -177,11 +179,11 @@ function getSymb($end, &$type) {
             $str.=$tmp;
         }
         else {
-            return "error";
+            return ERR;
         }
 
         if (($tmp = fgetc(STDIN)) != '@') {
-            return "error";
+            return ERR;
         }
         else {
             $str.="@";
@@ -203,7 +205,7 @@ function getSymb($end, &$type) {
         }
         if (strcmp($str, "int") == 0 && $tmp == '@') {
             $tmp = getInt($end);
-            if (strcmp($tmp, "error") != 0) {
+            if (strcmp($tmp, ERR) != 0) {
                 $str.="@";
                 $type = 2;
                 return $str.$tmp;
@@ -238,27 +240,24 @@ function getSymb($end, &$type) {
 
 // First part of variable name
 function getFrame() {
-    $str = skipWhite();
+    $frame = skipWhite();
 
     // LF, TF or GF
-    if ($str == 'L' || $str == 'T' || $str == 'G') {
+    if ($frame == 'L' || $frame == 'T' || $frame == 'G') {
         $tmp = fgetc(STDIN);
-        if ($tmp == 'F') {
-            $str.=$tmp;
-        }
-        else {
-            return "error";
-        }
+        if ($tmp == 'F')
+            $frame.=$tmp;
+        else
+            return ERR;
     }
-    else {
-        return "error";
-    }
+    else
+        return ERR;
 
     // @ check
-    if (($tmp = fgetc(STDIN)) != '@') {
-        return "error";
-    }
-    return $str."@";
+    if (fgetc(STDIN) != '@')
+        return ERR;
+
+    return $frame."@";
 }
 
 // Variable or label
@@ -268,65 +267,52 @@ function getVarLab($end, $is_var) {
     else 
         $str = "";
 
-    if (strcmp($str, "error") == 0) {
-        return "error";
-    }
+    if ($str == ERR)
+        return ERR;
 
     // Must start with alpha or special
-    $tmp = fgetc(STDIN);
-    if (ctype_alpha($tmp) || $tmp == '_' || $tmp == '-' || $tmp == '$' || $tmp == '&' || $tmp == '%' || $tmp == '*') {
-        $str.=$tmp;
-    }
-    else {
-        return "error";
-    }
+    $c = fgetc(STDIN);
+    if (ctype_alpha($c) || $c == '_' || $c == '-' || $c == '$' || $c == '&' || $c == '%' || $c == '*')
+        $str.=$c;
+    else
+        return -1;
 
-    while (true) {
-        $tmp = fgetc(STDIN);
+    while ($c = fgetc(STDIN)) {
 
-        if (ctype_alnum($tmp) || $tmp == '_' || $tmp == '-' || $tmp == '$' || $tmp == '&' || $tmp == '%' || $tmp == '*') {
-            $str.=$tmp;
+        if (ctype_alnum($c) || $c == '_' || $c == '-' || $c == '$' || $c == '&' || $c == '%' || $c == '*') {
+            $str.=$c;
             continue;
         }
-        if ($tmp == ' ' || $tmp == '\t') {
+        if ($c == ' ' || $c == '\t')
             break;
-        }
-        if ($tmp == '\n' && $end == true) {
+        if ($c == '\n' && $end == true)
             break;
-        }
-        else {
-            return "error";
-        }
+        else
+            return ERR;
     }
     return $str;
 }
 
 
 function getTyp($end) {
-    $str = skipWhite();
-    while (true) {
-        $c = fgetc(STDIN);
-
+    $type = skipWhite();
+    while ($c = fgetc(STDIN)) {
         if (ctype_alpha($c)) {
-            $str.=$c;
+            $type.=$c;
             continue;    
         }
-        if ($c == ' ' || $c == '\t') {
+        if ($c == ' ' || $c == '\t')
             break;
-        }
-        if ($c == '\n' && $end == true) {
+        if ($c == '\n' && $end == true)
             break;
-        }
-        else {
-            return "error";
-        }
+        else
+            return ERR;
     }
-    if (strcmp($str, "int") == 0 || strcmp($str, "string") == 0 || strcmp($str, "bool") == 0) {
-        return $str;
-    }
-    else {
-        return "error";
-    }
+
+    if (strcmp($type, "int") == 0 || strcmp($type, "string") == 0 || strcmp($type, "bool") == 0)
+        return $type;
+    else
+        return ERR;
 }
 
 function getInst() {
@@ -335,8 +321,8 @@ function getInst() {
     while ($op_code == '\n')
         $op_code = skipWhite();
 
-    if ($op_code == -1)
-        return -1;
+    if ($op_code == EOF)
+        return EOF;
 
     //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
     global $all_inst;
@@ -354,7 +340,7 @@ function getInst() {
             $no_arg = true;
         }
         else {
-            return -2;
+            return ERR;
         }
     }
     // Case insentive
@@ -367,13 +353,13 @@ function getInst() {
             // \n after operation code
             if ($no_arg == true) {
                 if (count($all_inst[$key]) != 0)
-                    return -2;
+                    return ERR;
             }
             return $op_code;
         }
     }
     // Unknown operation code
-    return -2;
+    return ERR;
 }
 
 function main() {
@@ -417,11 +403,11 @@ XML;
     while (true) {
         $var = getInst();
         // End of file
-        if ($var == -1) {
+        if ($var == EOF) {
             break;
         }
         // Unknown instruction
-        if ($var == -2) {
+        if ($var == ERR) {
             return 21;
         }
 
