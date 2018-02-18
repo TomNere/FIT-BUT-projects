@@ -63,30 +63,7 @@ $all_inst = array(
     "jumpifneq" => array(2, 3, 3)
 );
 
-/*
-// Zero parameter instructions
-$inst_0 = array("createframe", "pushframe", "popframe", "return", "break");
-
-// One parameter instructions
-$inst_1 = array("defvar", "call", "pushs", "pops", "write", "label", "jump", "dprint");
-
-// Two parameter instructions
-$inst_2 = array("move", "int2char", "read", "strlen", "type");
-
-// Three parameter instructions
-$inst_3 = array("add", "sub", "mul", "idiv", "lt", "gt", "eq", "and", "or", "not", "stri2int", "concat", "getchar", "setchar", "jumpifeq", "jumpifneq");
-*/
-
 /*********************FUNCTION DEFS************************/
-
-/*
-// Skip comments
-function skipComment() {
-    while (true) {
-        fe
-    }
-}
-*/
 
 // Skip white characters
 function skipWhite() {
@@ -355,17 +332,16 @@ function getTyp($end) {
 function getInst() {
     $op_code = skipWhite();
 
-    while ($op_code == '\n') {
-        $op_code = skipWhite();        
-    }
+    while ($op_code == '\n')
+        $op_code = skipWhite();
 
-    if ($op_code == -1) {
+    if ($op_code == -1)
         return -1;
-    }
 
     //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
     global $all_inst;
 
+    $no_arg = false;
     //$inst = new Instruction();
     $c;
     while ($c = fgetc(STDIN)) {
@@ -374,6 +350,9 @@ function getInst() {
         if (ctype_alnum($c)) {
             $op_code.=$c;
         }
+        else if ($c == '\n') {
+            $no_arg = true;
+        }
         else {
             return -2;
         }
@@ -381,25 +360,19 @@ function getInst() {
     // Case insentive
     $op_code = strtolower($op_code);
 
-    /*
-    foreach ($help_arr as $arr_name => $number) {
-        foreach ($$arr_name as $value) {
-            if ($value == $inst->name) {
-                $inst->params = $number;
-                return $inst;
-            }
-        }
-    }
-    */
-
     foreach ($all_inst as $key => $value) {
         //print $key;
         //print $op_code;
         if (strcmp($key, $op_code) == 0) {
+            // \n after operation code
+            if ($no_arg == true) {
+                if (count($all_inst[$key]) != 0)
+                    return -2;
+            }
             return $op_code;
         }
     }
-
+    // Unknown operation code
     return -2;
 }
 
@@ -412,6 +385,7 @@ function main() {
     if ($argc > 1) {
         if ($argv[1] == '--help') {
             print "show passed\n";
+            return 0;
         }
         else {
             fwrite(STDERR, "Unknown arguments!\n");
@@ -426,17 +400,6 @@ function main() {
         fwrite(STDERR, ".IPPcode18 is missing!\n");
         return 21;
     }
-    /*
-    $char = skipWhite();
-    if ($char == -1) {
-        return 0;
-    }
-    else if ($char != '\n') {
-        print $char;
-        fwrite(STDERR, ".IPPcode18 wrong!\n");
-        return 21;
-    }
-    */
 
     // Basic XML string
 $xml_str = <<<XML
@@ -525,10 +488,6 @@ XML;
                     break;
             }
         }
-
-        //print $var;
-        //print $var->name;
-        //print $var->params;
     }
     
     echo $xml_el->asXml();
