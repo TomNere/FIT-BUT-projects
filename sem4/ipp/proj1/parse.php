@@ -186,7 +186,7 @@ function getInt($end) {
     if (($c == '\n' && $end) || $c == '\t' || $c == ' ') {
         return $number;
     }
-    else 
+    else
         return "error";
 }
 
@@ -286,7 +286,6 @@ function getFrame() {
 
 // Variable or label
 function getVarLab($end, $is_var) {
-    
     if ($is_var == true)
         $str = getFrame();
     else 
@@ -312,7 +311,7 @@ function getVarLab($end, $is_var) {
             $str.=$tmp;
             continue;
         }
-        if ($c == ' ' || $c == '\t') {
+        if ($tmp == ' ' || $tmp == '\t') {
             break;
         }
         if ($tmp == '\n' && $end == true) {
@@ -372,10 +371,12 @@ function getInst() {
     while ($c = fgetc(STDIN)) {
         if ($c == ' ' || $c == '\t')
             break;
-        if (ctype_alnum($c))
-            $op_code.$c;
-        else 
+        if (ctype_alnum($c)) {
+            $op_code.=$c;
+        }
+        else {
             return -2;
+        }
     }
     // Case insentive
     $op_code = strtolower($op_code);
@@ -392,6 +393,8 @@ function getInst() {
     */
 
     foreach ($all_inst as $key => $value) {
+        //print $key;
+        //print $op_code;
         if (strcmp($key, $op_code) == 0) {
             return $op_code;
         }
@@ -436,10 +439,10 @@ function main() {
     */
 
     // Basic XML string
-    $xml_str = <<<XML
-    <?xml version="1.0" encoding="UTF-8"?>
-    <program language="IPPcode18">
-    </program>
+$xml_str = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode18">
+</program>
 XML;
     
     $xml_el = new SimpleXMLElement($xml_str);
@@ -450,10 +453,9 @@ XML;
     // Repeat until error or EOF
     while (true) {
         $var = getInst();
-
         // End of file
         if ($var == -1) {
-            return 0;
+            break;
         }
         // Unknown instruction
         if ($var == -2) {
@@ -464,11 +466,11 @@ XML;
         $end;
         $inst_count++;
 
-        //global $all_inst;
+        global $all_inst;
 
         $xml_inst = $xml_el->addChild("instruction");
         $xml_inst->addAttribute("order", $inst_count);
-        $xml_inst->addAttribute("opcode", ctype_upper($var));  
+        $xml_inst->addAttribute("opcode", strtoupper($var));  
 
         foreach ($all_inst[$var] as $key => $value) {
             if (count($all_inst[$var]) == ($key + 1)) 
@@ -481,11 +483,13 @@ XML;
             switch ($value) {
                 case 1:
                     $str = getVarLab($end, true);
-                    $xml_arg.addAttribute("type", "var");
+                    $xml_arg->addAttribute("type", "var");
+                    $xml_arg = $str;
                     break;
                 case 2:
                     $str = getVarLab($end, false);
-                    $xml_arg.addAttribute("type", "label");
+                    $xml_arg->addAttribute("type", "label");
+                    $xml_arg = $str;
                     break;
                 case 3:
                     //$c = skipWhite();
@@ -494,26 +498,27 @@ XML;
                     $str = getSymb($end, $type);
                     switch ($type) {
                         case 1:
-                            $xml_arg.addAttribute("type", "var");
+                            $xml_arg->addAttribute("type", "var");
                             break;
                         case 2:
-                            $xml_arg.addAttribute("type", "int");
+                            $xml_arg->addAttribute("type", "int");
                             break;
                         case 3:
-                            $xml_arg.addAttribute("type", "string");
+                            $xml_arg->addAttribute("type", "string");
                             break;
                         case 4:
-                            $xml_arg.addAttribute("type", "bool");
+                            $xml_arg->addAttribute("type", "bool");
                             break;
                         default:
                             // WTF
                             break;
                     }
-                    
+                    $xml_arg = $str;
                     break;
                 case 4:
-                    $str = getType($end);
-                    $xml_arg.addAttribute("type", "type");
+                    $str = getTyp($end);
+                    $xml_arg->addAttribute("type", "type");
+                    $xml_arg = $str;
                     break;
                 default:
                     // WTF
@@ -526,7 +531,7 @@ XML;
         //print $var->params;
     }
     
-
+    echo $xml_el->asXml();
     return 0;
 }
 
