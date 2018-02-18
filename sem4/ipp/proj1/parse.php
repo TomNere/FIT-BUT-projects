@@ -171,72 +171,65 @@ function getInt($end) {
 
 // Constant or variable
 function getSymb($end, &$type) {
-    $str = skipWhite();
+    $symb = skipWhite();
 
-    if ($str == 'L' || $str == 'T' || $str == 'G') {
+    if ($symb == 'L' || $symb == 'T' || $symb == 'G') {
         $tmp = fgetc(STDIN);
-        if ($tmp == 'F') {
-            $str.=$tmp;
-        }
-        else {
+        if ($tmp == 'F')
+            $symb.=$tmp;
+        else
             return ERR;
-        }
 
-        if (($tmp = fgetc(STDIN)) != '@') {
+        if (fgetc(STDIN) != '@') {
             return ERR;
-        }
         else {
-            $str.="@";
+            $symb.="@";
             $tmp = getVarLab($end, false);
             $type = 1;
-            return $str.$tmp;         
+            return $symb.$tmp;         
         }
     }
     
-    if (ctype_lower($str)) {
+    if (ctype_lower($symb)) {
         $tmp;
         while ($tmp = fgetc(STDIN)) {
             if (ctype_lower($tmp)) {
-                $str.$tmp;
-            }
-            else {
+                $symb.$tmp;
+            else
                 break;
+        }
+
+        if (strcmp($symb, "int") == 0 && $tmp == '@') {
+            $tmp = getInt($end);
+            if ($tmp != ERR) {
+                $symb.="@";
+                $type = 2;
+                return $symb.$tmp;
             }
         }
-        if (strcmp($str, "int") == 0 && $tmp == '@') {
-            $tmp = getInt($end);
-            if (strcmp($tmp, ERR) != 0) {
-                $str.="@";
-                $type = 2;
-                return $str.$tmp;
-            } 
-        }
-        if (strcmp($str, "string") == 0 && $tmp == '@') {
+        if (strcmp($symb, "string") == 0 && $tmp == '@') {
             $type = 3;
             return getString();
         }
-        if (strcmp($str, "bool") == 0 && $tmp == '@')
-            $str.='@';
+        if (strcmp($symb, "bool") == 0 && $tmp == '@') {
+            $symb.='@';
             $tmp = "";
             while ($c = fgetc(STDIN)) {
-                if (ctype_lower($c)) {
+                if (ctype_lower($c))
                     $tmp.$c;
-                }
-                else {
+                else
                     break;
-                }
             }
+
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0) {
                 $type = 4;
-                return $str.$tmp;
+                return $symb.$tmp;
             }
         }
     }
-
-    // @ check
     
-
-//}
+    return ERR;
+}
 
 // First part of variable name
 function getFrame() {
