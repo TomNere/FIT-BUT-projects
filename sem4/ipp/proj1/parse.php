@@ -77,12 +77,12 @@ function skipWhite() {
 
         $char = fgetc(STDIN);
 
-        if ($char == '#') {
+        if ($char == "#") {
             fgets(STDIN);
             continue;
         }
-        if ($char == '\n') {
-            return '\n';
+        if ($char == "\n") {
+            return "\n";
         }
         if (ctype_space($char)) {
             continue;
@@ -94,8 +94,7 @@ function skipWhite() {
 }
 
 // Read Escape sequence
-function getEscape($end) {
-
+function getEscape() {
     $number = fgets(STDIN, 3);
     // 000-999
     if (ctype_digit($number)) {
@@ -117,22 +116,21 @@ function getString($end) {
     $c;
     $str = "";
     while($c = fgetc(STDIN)) {
-        if (($c == '\n' && $end) || $c == ' ' || $c == '\t') {
+        if (($c == "\n" && $end) || $c == " " || $c == "\t")
             break;
-        }
-        if ($c == 92) {
-            $tmp = getEscape($end);
-
-            if (strcmp($tmp, ERR) != 0) {
-                $str.$tmp;
-                break;
+        if ($c == chr(92)) {
+            $tmp = getEscape();
+            if ($tmp != ERR) {
+                $str.="\\";
+                $str.=$tmp;
+                continue;
             }
             else
                 return ERR;
         }
         // Comment
-        if ($c == 35) {
-            skipComment();
+        if ($c == chr(35)) {
+            fgets(STDIN);
             break;
         }
         if (ctype_print($c)) {
@@ -149,20 +147,18 @@ function getInt($end) {
     $c = fgetc(STDIN);
     $number;
 
-    if (is_numeric($c) || $c == '+' || $c == '-') {
+    if (is_numeric($c) || $c == "+" || $c == "-")
         $number = $c;
-    }
-    else 
+    else
         return ERR;
 
     while ($c = fgetc(STDIN)) {
-        if (is_numeric($c)) {
+        if (is_numeric($c))
             $number.=$c;
-        }
-        else 
+        else
             break;
     }
-    if (($c == '\n' && $end) || $c == '\t' || $c == ' ') {
+    if (($c == "\n" && $end) || $c == "\t" || $c == " ") {
         return $number;
     }
     else
@@ -173,33 +169,36 @@ function getInt($end) {
 function getSymb($end, &$type) {
     $symb = skipWhite();
 
-    if ($symb == 'L' || $symb == 'T' || $symb == 'G') {
+    if ($symb == "L" || $symb == "T" || $symb == "G") {
         $tmp = fgetc(STDIN);
-        if ($tmp == 'F')
+        if ($tmp == "F")
             $symb.=$tmp;
         else
             return ERR;
 
-        if (fgetc(STDIN) != '@') {
+        if (fgetc(STDIN) != "@")
             return ERR;
         else {
             $symb.="@";
             $tmp = getVarLab($end, false);
             $type = 1;
-            return $symb.$tmp;         
+
+            if ($tmp != ERR) 
+                return $symb.$tmp;
+            else
+                return ERR;
         }
     }
     
     if (ctype_lower($symb)) {
         $tmp;
         while ($tmp = fgetc(STDIN)) {
-            if (ctype_lower($tmp)) {
-                $symb.$tmp;
+            if (ctype_lower($tmp))
+                $symb.=$tmp;
             else
                 break;
         }
-
-        if (strcmp($symb, "int") == 0 && $tmp == '@') {
+        if (strcmp($symb, "int") == 0 && $tmp == "@") {
             $tmp = getInt($end);
             if ($tmp != ERR) {
                 $symb.="@";
@@ -207,16 +206,16 @@ function getSymb($end, &$type) {
                 return $symb.$tmp;
             }
         }
-        if (strcmp($symb, "string") == 0 && $tmp == '@') {
+        if (strcmp($symb, "string") == 0 && $tmp == "@") {
             $type = 3;
-            return getString();
+            return getString($end);
         }
-        if (strcmp($symb, "bool") == 0 && $tmp == '@') {
-            $symb.='@';
+        if (strcmp($symb, "bool") == 0 && $tmp == "@") {
+            $symb.="@";
             $tmp = "";
             while ($c = fgetc(STDIN)) {
                 if (ctype_lower($c))
-                    $tmp.$c;
+                    $tmp.=$c;
                 else
                     break;
             }
@@ -227,7 +226,7 @@ function getSymb($end, &$type) {
             }
         }
     }
-    
+
     return ERR;
 }
 
@@ -236,9 +235,9 @@ function getFrame() {
     $frame = skipWhite();
 
     // LF, TF or GF
-    if ($frame == 'L' || $frame == 'T' || $frame == 'G') {
+    if ($frame == "L" || $frame == "T" || $frame == "G") {
         $tmp = fgetc(STDIN);
-        if ($tmp == 'F')
+        if ($tmp == "F")
             $frame.=$tmp;
         else
             return ERR;
@@ -247,7 +246,7 @@ function getFrame() {
         return ERR;
 
     // @ check
-    if (fgetc(STDIN) != '@')
+    if (fgetc(STDIN) != "@")
         return ERR;
 
     return $frame."@";
@@ -265,23 +264,26 @@ function getVarLab($end, $is_var) {
 
     // Must start with alpha or special
     $c = fgetc(STDIN);
-    if (ctype_alpha($c) || $c == '_' || $c == '-' || $c == '$' || $c == '&' || $c == '%' || $c == '*')
+    if (ctype_alpha($c) || $c == "_" || $c == "-" || $c == "$" || $c == "&" || $c == "%" || $c == "*")
         $str.=$c;
     else
         return -1;
 
     while ($c = fgetc(STDIN)) {
 
-        if (ctype_alnum($c) || $c == '_' || $c == '-' || $c == '$' || $c == '&' || $c == '%' || $c == '*') {
+        if (ctype_alnum($c) || $c == "_" || $c == "-" || $c == "$" || $c == "&" || $c == "%" || $c == "*") {
             $str.=$c;
             continue;
         }
-        if ($c == ' ' || $c == '\t')
+        if ($c == " " || $c == "\t") {
             break;
-        if ($c == '\n' && $end == true)
+        }
+        if ($c == "\n" && $end == true) {
             break;
-        else
+        }
+        else {
             return ERR;
+        }
     }
     return $str;
 }
@@ -294,9 +296,9 @@ function getTyp($end) {
             $type.=$c;
             continue;    
         }
-        if ($c == ' ' || $c == '\t')
+        if ($c == " " || $c == "\t")
             break;
-        if ($c == '\n' && $end == true)
+        if ($c == "\n" && $end == true)
             break;
         else
             return ERR;
@@ -311,7 +313,7 @@ function getTyp($end) {
 function getInst() {
     $op_code = skipWhite();
 
-    while ($op_code == '\n')
+    while ($op_code == "\n")
         $op_code = skipWhite();
 
     if ($op_code == EOF)
@@ -324,12 +326,12 @@ function getInst() {
     //$inst = new Instruction();
     $c;
     while ($c = fgetc(STDIN)) {
-        if ($c == ' ' || $c == '\t')
+        if ($c == " " || $c == "\t")
             break;
         if (ctype_alnum($c)) {
             $op_code.=$c;
         }
-        else if ($c == '\n') {
+        else if ($c == "\n") {
             $no_arg = true;
         }
         else {
@@ -425,47 +427,59 @@ XML;
             switch ($value) {
                 case 1:
                     $str = getVarLab($end, true);
+                    if ($str == ERR)
+                        return 21;
                     $xml_arg->addAttribute("type", "var");
-                    $xml_arg = $str;
+                    $xml_arg[0] = $str;
                     break;
                 case 2:
                     $str = getVarLab($end, false);
+                    if ($str == ERR)
+                        return 21;
                     $xml_arg->addAttribute("type", "label");
-                    $xml_arg = $str;
+                    $xml_arg[0] = $str;
                     break;
                 case 3:
                     //$c = skipWhite();
                     //if ()
                     $type;
                     $str = getSymb($end, $type);
+                    if ($str == ERR)
+                        return 21;
                     switch ($type) {
                         case 1:
                             $xml_arg->addAttribute("type", "var");
+                            $xml_arg[0] = $str;
                             break;
                         case 2:
                             $xml_arg->addAttribute("type", "int");
+                            $xml_arg[0] = strstr($str, "@");
                             break;
                         case 3:
                             $xml_arg->addAttribute("type", "string");
+                            $xml_arg[0] = strstr($str, "@");
                             break;
                         case 4:
                             $xml_arg->addAttribute("type", "bool");
+                            $xml_arg[0] = strstr($str, "@");
                             break;
                         default:
                             // WTF
                             break;
                     }
-                    $xml_arg = $str;
                     break;
                 case 4:
                     $str = getTyp($end);
+                    if ($str == ERR)
+                        return 21;
                     $xml_arg->addAttribute("type", "type");
-                    $xml_arg = $str;
+                    $xml_arg[0] = $str;
                     break;
                 default:
                     // WTF
                     break;
             }
+           // echo $xml_el->asXml();
         }
     }
     
