@@ -1,15 +1,4 @@
-<?php 
-/*********************CLASS DEFS***************************/
-
-/**
-* This class represents instruction
-*/
-/*
-class Instruction {
-    public $name;
-    public $params;
-}
-*/
+<?php
 
 const ARG_ERR = 10;
 const EOF = -1;
@@ -71,25 +60,22 @@ $all_inst = array(
 function skipWhite() {
     $char;
     while (true) {
-        if (feof(STDIN)) {
+        if (feof(STDIN))
             return EOF;
-        }
 
         $char = fgetc(STDIN);
 
-        if ($char == "#") {
+        if (strcmp($char, "#") == 0) {
             fgets(STDIN);
             continue;
         }
-        if ($char == "\n") {
+        if (strcmp($char, "\n") == 0)
             return "\n";
-        }
-        if (ctype_space($char)) {
+
+        if (ctype_space($char))
             continue;
-        }
-        else {
+        else
             return $char;
-        }
     }
 }
 
@@ -102,7 +88,7 @@ function getEscape() {
             return "&lt";
         else if (strcmp($number, "062") == 0)
             return "&gt";
-        else if (strcmp($number, "038"))
+        else if (strcmp($number, "038") == 0)
             return "&amp";
         else 
             return $number;
@@ -115,13 +101,14 @@ function getEscape() {
 function getString($end) {
     $c;
     $str = "";
+
     while($c = fgetc(STDIN)) {
-        if (($c == "\n" && $end) || $c == " " || $c == "\t")
+        if (((strcmp($c, "\n") == 0) && $end) || (strcmp($c, " ") == 0) || (strcmp($c, "\t") == 0))
             break;
-        if ($c == chr(92)) {
+        if (strcmp($c, chr(92)) == 0) {
             $tmp = getEscape();
             if ($tmp != ERR) {
-                $str.="\\";
+                $str.=chr(92);
                 $str.=$tmp;
                 continue;
             }
@@ -129,14 +116,12 @@ function getString($end) {
                 return ERR;
         }
         // Comment
-        if ($c == chr(35)) {
+        if (strcmp($c, chr(35)) == 0) {
             fgets(STDIN);
             break;
         }
-        if (ctype_print($c)) {
+        if (ctype_print($c))
             $str.=$c;
-            continue;
-        }
     }
     return $str;
 }
@@ -147,7 +132,7 @@ function getInt($end) {
     $c = fgetc(STDIN);
     $number;
 
-    if (is_numeric($c) || $c == "+" || $c == "-")
+    if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)
         $number = $c;
     else
         return ERR;
@@ -158,7 +143,7 @@ function getInt($end) {
         else
             break;
     }
-    if (($c == "\n" && $end) || $c == "\t" || $c == " ") {
+    if ((strcmp($c, "\n") == 0 && $end) || strcmp($c, "\t") == 0 || strcmp($c, " ") == 0) {
         return $number;
     }
     else
@@ -169,49 +154,48 @@ function getInt($end) {
 function getSymb($end, &$type) {
     $symb = skipWhite();
 
-    if ($symb == "L" || $symb == "T" || $symb == "G") {
+    if (strcmp($symb, "L") == 0 || strcmp($symb, "T") == 0 || strcmp($symb, "G") == 0) {
         $tmp = fgetc(STDIN);
-        if ($tmp == "F")
+
+        if (strcmp($tmp, "F") == 0)
             $symb.=$tmp;
         else
             return ERR;
 
-        if (fgetc(STDIN) != "@")
+        if (strcmp(fgetc(STDIN), "@") != 0)
             return ERR;
         else {
-            $symb.="@";
             $tmp = getVarLab($end, false);
             $type = 1;
 
             if ($tmp != ERR) 
-                return $symb.$tmp;
+                return $symb."@".$tmp;
             else
                 return ERR;
         }
     }
     
     if (ctype_lower($symb)) {
-        $tmp;
-        while ($tmp = fgetc(STDIN)) {
-            if (ctype_lower($tmp))
-                $symb.=$tmp;
+        $c;
+        while ($c = fgetc(STDIN)) {
+            if (ctype_lower($c))
+                $symb.=$c;
             else
                 break;
         }
-        if (strcmp($symb, "int") == 0 && $tmp == "@") {
-            $tmp = getInt($end);
-            if ($tmp != ERR) {
-                $symb.="@";
-                $type = 2;
-                return $symb.$tmp;
-            }
+
+        if (strcmp($c, "@") != 0)
+            return ERR;
+
+        if (strcmp($symb, "int") == 0) {
+            $type = 2;
+            return getInt($end);
         }
-        if (strcmp($symb, "string") == 0 && $tmp == "@") {
+        if (strcmp($symb, "string") == 0) {
             $type = 3;
             return getString($end);
         }
-        if (strcmp($symb, "bool") == 0 && $tmp == "@") {
-            $symb.="@";
+        if (strcmp($symb, "bool") == 0) {
             $tmp = "";
             while ($c = fgetc(STDIN)) {
                 if (ctype_lower($c))
@@ -219,14 +203,12 @@ function getSymb($end, &$type) {
                 else
                     break;
             }
-
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0) {
                 $type = 4;
-                return $symb.$tmp;
+                return $tmp;
             }
         }
     }
-
     return ERR;
 }
 
