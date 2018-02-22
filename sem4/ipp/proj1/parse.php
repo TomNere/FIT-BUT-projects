@@ -86,7 +86,8 @@ function skipWhite() {
 
 // Read Escape sequence
 function getEscape() {
-    $number = fgets(STDIN, 3);
+    $number = "";
+    $number = fgets(STDIN, 4);
     // 000-999
     if (ctype_digit($number)) {
         if (strcmp($number, "060") == 0)
@@ -99,7 +100,7 @@ function getEscape() {
             return $number;
     }
     else
-        terminate(21, "Escape sequence expected.")
+        terminate(21, "Escape sequence expected.");
 }
 
 // Read string
@@ -153,12 +154,12 @@ function getInt($end) {
 
 // Constant or variable
 function getSymb($end, &$type) {
-    $frame
+    $frame;
     $type = getFrame($frame, false);
 
     switch ($type) {
         case 1:
-            return $frame.getVarLab($end, false);
+            return $frame."@".getVarLab($end, false);
             break;
         case 2:
             return getInt($end);
@@ -178,9 +179,8 @@ function getSymb($end, &$type) {
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
             break;
-        
         default:
-            terminate(21, "Unknown error.")
+            terminate(21, "Unknown error.");
             break;
     }
 }
@@ -235,16 +235,16 @@ function getFrame(&$frame, $is_type) {
 
 // Variable or label
 function getVarLab($end, $is_var) {
+    $str = "";
+
     if ($is_var == true) {
-        $frame;
-        $is_frame = getFrame($frame, false);   
+        $is_frame = getFrame($str, false);
+
+        if ($is_frame != 1)
+            terminate(21, "Variable name expected.");
+        $str.="@";
     }
-    else
-        $str = "";
-
-    if ($is_frame != 1)
-        terminate(21, "Variable name expected.");
-
+ 
     // Must start with alpha or special
     $c = fgetc(STDIN);
     if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)
@@ -269,76 +269,44 @@ function getVarLab($end, $is_var) {
 
 
 function getTyp($end) {
-    $tmp;
+    $frame;
     $type = getFrame($frame, true); 
-    if (getFrame($frame, true) != 1) {
-        // read to end of line
-        if ($end == true) {
-            if (ctype_space(fgets(STDIN)) != 1)
-                terminate(21, "Invalid arguments of instruction.");
-        }
-        else {
-            $c = fgetc(STDIN);
-            if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
-                switch (variable) {
-                    case 'value':
-                        # code...
-                        break;
-                    
-                    default:
-                        # code...
-                        break;
-                }
-            }
-        }
-    }
+    if ($type != 1)
+        return $frame;
+
+    terminate(21, "Type expected.");
 }
 
 function getInst() {
     $op_code = skipWhite();
 
-    while ($op_code == "\n")
+    while (strcmp($op_code, "\n") == 0)
         $op_code = skipWhite();
 
     if ($op_code == EOF)
         return EOF;
 
-    //global $help_arr, $inst_0, $inst_1, $inst_2, $inst_3;
     global $all_inst;
-
-    $no_arg = false;
-    //$inst = new Instruction();
     $c;
+
     while ($c = fgetc(STDIN)) {
-        if ($c == " " || $c == "\t")
+        if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0){
             break;
-        if (ctype_alnum($c)) {
+        }
+        if (ctype_alnum($c))
             $op_code.=$c;
-        }
-        else if ($c == "\n") {
-            $no_arg = true;
-        }
-        else {
-            return ERR;
-        }
+        else
+            terminate(21, "Unknown instruction");
     }
     // Case insentive
     $op_code = strtolower($op_code);
 
     foreach ($all_inst as $key => $value) {
-        //print $key;
-        //print $op_code;
-        if (strcmp($key, $op_code) == 0) {
-            // \n after operation code
-            if ($no_arg == true) {
-                if (count($all_inst[$key]) != 0)
-                    return ERR;
-            }
+        if (strcmp($key, $op_code) == 0)
             return $op_code;
-        }
     }
     // Unknown operation code
-    return ERR;
+    terminate(21, "Unknown instruction");
 }
 
 function main() {
@@ -359,12 +327,11 @@ function main() {
     }
     
     // First line check
-    $char = skipWhite();
-    $first_line = $char.rtrim(strtolower(fgets(STDIN)));
-    if (strcmp($first_line, ".ippcode18") != 0) {
-        fwrite(STDERR, ".IPPcode18 is missing!\n");
-        return 21;
-    }
+    $tmp = skipWhite();
+    $tmp = $tmp.rtrim(strtolower(fgets(STDIN)));
+
+    if (strcmp($tmp, ".ippcode18") != 0)
+        terminate(21, ".IPPcode18 is missing!");
 
     // Basic XML string
 $xml_str = <<<XML
@@ -378,23 +345,18 @@ XML;
     // Instruction counter
     $inst_count = 0;
 
+    global $all_inst;
+    // $end signalize last parameter
+        $end;
+
     // Repeat until error or EOF
     while (true) {
         $var = getInst();
         // End of file
-        if ($var == EOF) {
+        if ($var == EOF)
             break;
-        }
-        // Unknown instruction
-        if ($var == ERR) {
-            return 21;
-        }
 
-        // $end signalize last parameter
-        $end;
-        $inst_count++;
-
-        global $all_inst;
+        $inst_count++;        
 
         $xml_inst = $xml_el->addChild("instruction");
         $xml_inst->addAttribute("order", $inst_count);
@@ -410,54 +372,39 @@ XML;
 
             switch ($value) {
                 case 1:
-                    $str = getVarLab($end, true);
-                    if ($str == ERR)
-                        return 21;
                     $xml_arg->addAttribute("type", "var");
-                    $xml_arg[0] = $str;
+                    $xml_arg[0] = getVarLab($end, true);
                     break;
                 case 2:
-                    $str = getVarLab($end, false);
-                    if ($str == ERR)
-                        return 21;
                     $xml_arg->addAttribute("type", "label");
-                    $xml_arg[0] = $str;
+                    $xml_arg[0] = getVarLab($end, false);
                     break;
                 case 3:
-                    //$c = skipWhite();
-                    //if ()
                     $type;
                     $str = getSymb($end, $type);
-                    if ($str == ERR)
-                        return 21;
+
                     switch ($type) {
                         case 1:
                             $xml_arg->addAttribute("type", "var");
-                            $xml_arg[0] = $str;
                             break;
                         case 2:
                             $xml_arg->addAttribute("type", "int");
-                            $xml_arg[0] = strstr($str, "@");
                             break;
                         case 3:
                             $xml_arg->addAttribute("type", "string");
-                            $xml_arg[0] = strstr($str, "@");
                             break;
                         case 4:
                             $xml_arg->addAttribute("type", "bool");
-                            $xml_arg[0] = strstr($str, "@");
                             break;
                         default:
                             // WTF
                             break;
                     }
+                    $xml_arg[0] = $str;
                     break;
                 case 4:
-                    $str = getTyp($end);
-                    if ($str == ERR)
-                        return 21;
                     $xml_arg->addAttribute("type", "type");
-                    $xml_arg[0] = $str;
+                    $xml_arg[0] = getTyp($end);
                     break;
                 default:
                     // WTF
@@ -467,10 +414,9 @@ XML;
         }
     }
     
-    echo $xml_el->asXml();
-    return 0;
+    print $xml_el->asXml();
 }
 
-return main();
+main();
 
 ?>
