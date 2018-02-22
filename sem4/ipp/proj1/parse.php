@@ -8,7 +8,7 @@ const ERR = -2;
 /******************GLOBAL VARIABLES**************************/
 $params;
 $file;
-$stats = $comments = $loc = false;
+$stats = false;
 $line_count = 1;
 $comment_count = 0;
 
@@ -65,12 +65,16 @@ $all_inst = array(
 /*********************FUNCTION DEFS************************/
 
 function terminate($code, $str) {
-    fwrite(STDERR, "Error found in line ".$line_count."!\n".$str."\n");
+    global $line_count;
+    if ($code == SYN_ERR)
+        fwrite(STDERR, "Error found in line ".$line_count."!\n");
+    fwrite(STDERR, $str."\n");
     exit($code);
 }
 
 // Skip white characters
 function skipWhite() {
+    global $line_count, $comment_count;
     $c;
     while (true) {
         if (feof(STDIN))
@@ -116,6 +120,7 @@ function getEscape() {
 
 // Read string
 function getString($end) {
+    global $line_count, $comment_count;
     $c;
     $str = "";
 
@@ -183,12 +188,13 @@ function getInt($end) {
 
 // Constant or variable
 function getSymb($end, &$type) {
+    global $line_count, $comment_count;
     $frame;
     $type = getFrame($frame, false, $end);
 
     switch ($type) {
         case 1:
-            return $frame."@".getVarLab($end, false);
+            return $frame.getVarLab($end, false);
             break;
         case 2:
             return getInt($end);
@@ -236,6 +242,7 @@ function getSymb($end, &$type) {
 * arg $str is used when returning 1
 */
 function getFrame(&$frame, $is_type, $end) {
+    global $line_count, $comment_count;
     $frame = skipWhite();
 
     if (strcmp($frame, "L") == 0 || strcmp($frame, "T") == 0 || strcmp($frame, "G") == 0) {
@@ -269,7 +276,7 @@ function getFrame(&$frame, $is_type, $end) {
             if (strcmp($c, "\n") == 0 && $end)
                 $line_count++;
             else if ((strcmp($c, "\t") == 0 || strcmp($c, " ") == 0))
-                //
+                ;
             else if (strcmp($c, chr(35)) == 0 && $end) {
                 fgets(STDIN);
                 $comment_count++;
@@ -291,6 +298,7 @@ function getFrame(&$frame, $is_type, $end) {
 
 // Variable or label
 function getVarLab($end, $is_var) {
+    global $line_count, $comment_count;
     $str = "";
 
     if ($is_var == true) {
@@ -298,7 +306,6 @@ function getVarLab($end, $is_var) {
 
         if ($is_frame != 1)
             terminate(SYN_ERR, "Variable name expected.");
-        $str.="@";
     }
  
     // Must start with alpha or special
@@ -342,6 +349,7 @@ function getTyp($end) {
 }
 
 function getInst() {
+    global $line_count, $comment_count; 
     $op_code = skipWhite();
 
     while (strcmp($op_code, "\n") == 0)
@@ -360,7 +368,7 @@ function getInst() {
             break;
         }
         if (strcmp($c, "\n") == 0) {
-            $line_count++
+            $line_count++;
             $no_arg = true;
         }
         if (strcmp($c, chr(35)) == 0) {
@@ -392,13 +400,29 @@ function getInst() {
     terminate(SYN_ERR, "Unknown instruction");
 }
 
+function extension() {
+    global $stats, $file, $params, $comment_count, $inst_count;
+
+    if ($stats) {
+        $handle = fopen($file, "w");
+        if ($handle == false)
+            terminate(12, "Unable to open file.");
+        foreach ($params as $key => $value) {
+            if (strcmp($key, "loc") == 0)
+                fwrite($handle, $inst_count."\n");
+            if (strcmp($key, "comments") == 0)
+                fwrite($handle, $comment_count."\n");
+        }
+    }
+}
+
 function argHandle() {
-    global $argc, $params, $stats, $file, $comments, $loc;
+    global $argc, $params, $stats, $file;
     // No arguments
     if ($argc == 1)
         return;
 
-    $options = array("help", "file:", "comments", "loc");
+    $options = array("help", "stats:", "comments", "loc");
     $params = getopt("", $options);
 
     if ($params == false) {
@@ -417,9 +441,9 @@ function argHandle() {
                     "   --comments   Number of lines with comments are logged\n");
             exit(0);
         }
-        else if (isset($params["file"])) {
+        else if (isset($params["stats"])) {
             $stats = true;
-            $file = $params["file"];
+            $file = $params["stats"];
         }
         else
             terminate(ARG_ERR, "Wrong arguments, try --help.");
@@ -427,22 +451,20 @@ function argHandle() {
     else if ($argc == 3) {
         if (isset($params["help"]))
             terminate(ARG_ERR, "Wrong arguments, try --help.");
-        if (isset($params["file"])) {
+        if (isset($params["stats"])) {
             $stats = true;
-            $file = $params["file"];
+            $file = $params["stats"];
         }
-        if (isset($params["comments"]))
-            $comments = true;
-        else
-            $loc = true;
+        if (!isset($params["loc"]) && !isset($params["comment"]))
+            terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 4) {
         if (isset($params["help"]))
             terminate(ARG_ERR, "Wrong arguments, try --help.");
+        if (!isset($params["stats"]) || !isset($params["loc"]) || !isset($params["comment"]))
+            terminate(ARG_ERR, "Wrong arguments, try --help.");
         $stats = true;
-        $file = $params["file"];
-        $loc = true;
-        $comments = true;
+        $file = $params["stats"];
     }
     else
         terminate(ARG_ERR, "Wrong arguments, try --help.");
@@ -468,7 +490,7 @@ XML;
     
     $xml_el = new SimpleXMLElement($xml_str);
 
-    global $inst_count, $all_inst, $line_count;
+    global $inst_count, $all_inst, $line_count, $comment_count;
 
     // $end signalize last parameter
     $end;
@@ -566,7 +588,7 @@ XML;
         else if (($line_count - $actual_line) != 1)
             terminate(SYN_ERR, "Instruction on multiple lines.");
     }
-    
+    extension();
     print $xml_el->asXml();
 }
 
