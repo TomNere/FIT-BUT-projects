@@ -1,5 +1,5 @@
 <?php
-
+/*******************CONSTANTS DEFINITIONS********************/
 const ARG_ERR = 10;
 const EOF = -1;
 const ERR = -2;
@@ -56,6 +56,11 @@ $all_inst = array(
 
 /*********************FUNCTION DEFS************************/
 
+function terminate($code, $str) {
+    fwrite(STDERR, $str."\n");
+    exit($code);
+}
+
 // Skip white characters
 function skipWhite() {
     $char;
@@ -94,7 +99,7 @@ function getEscape() {
             return $number;
     }
     else
-        return ERR;
+        terminate(21, "Escape sequence expected.")
 }
 
 // Read string
@@ -107,13 +112,9 @@ function getString($end) {
             break;
         if (strcmp($c, chr(92)) == 0) {
             $tmp = getEscape();
-            if ($tmp != ERR) {
-                $str.=chr(92);
-                $str.=$tmp;
-                continue;
-            }
-            else
-                return ERR;
+            $str.=chr(92);
+            $str.=$tmp;
+            continue;
         }
         // Comment
         if (strcmp($c, chr(35)) == 0) {
@@ -135,7 +136,7 @@ function getInt($end) {
     if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)
         $number = $c;
     else
-        return ERR;
+        terminate(21, "Invalid int.");
 
     while ($c = fgetc(STDIN)) {
         if (is_numeric($c))
@@ -143,153 +144,154 @@ function getInt($end) {
         else
             break;
     }
-    if ((strcmp($c, "\n") == 0 && $end) || strcmp($c, "\t") == 0 || strcmp($c, " ") == 0) {
+
+    if ((strcmp($c, "\n") == 0 && $end) || strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
         return $number;
-    }
     else
-        return ERR;
+        terminate(21, "Invalid int.");
 }
 
 // Constant or variable
 function getSymb($end, &$type) {
-    $symb = skipWhite();
+    $frame
+    $type = getFrame($frame, false);
 
-    if (strcmp($symb, "L") == 0 || strcmp($symb, "T") == 0 || strcmp($symb, "G") == 0) {
-        $tmp = fgetc(STDIN);
-
-        if (strcmp($tmp, "F") == 0)
-            $symb.=$tmp;
-        else
-            return ERR;
-
-        if (strcmp(fgetc(STDIN), "@") != 0)
-            return ERR;
-        else {
-            $tmp = getVarLab($end, false);
-            $type = 1;
-
-            if ($tmp != ERR) 
-                return $symb."@".$tmp;
-            else
-                return ERR;
-        }
-    }
-    
-    if (ctype_lower($symb)) {
-        $c;
-        while ($c = fgetc(STDIN)) {
-            if (ctype_lower($c))
-                $symb.=$c;
-            else
-                break;
-        }
-
-        if (strcmp($c, "@") != 0)
-            return ERR;
-
-        if (strcmp($symb, "int") == 0) {
-            $type = 2;
+    switch ($type) {
+        case 1:
+            return $frame.getVarLab($end, false);
+            break;
+        case 2:
             return getInt($end);
-        }
-        if (strcmp($symb, "string") == 0) {
-            $type = 3;
+            break;
+        case 3:
             return getString($end);
-        }
-        if (strcmp($symb, "bool") == 0) {
+            break;
+        case 4:
             $tmp = "";
+            $c;
             while ($c = fgetc(STDIN)) {
                 if (ctype_lower($c))
                     $tmp.=$c;
                 else
                     break;
             }
-            if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0) {
-                $type = 4;
+            if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
-            }
-        }
+            break;
+        
+        default:
+            terminate(21, "Unknown error.")
+            break;
     }
-    return ERR;
 }
 
-// First part of variable name
-function getFrame() {
+/* Get frame or type - int, string, bool
+* return int which symbolize
+* 1 - frame
+* 2 - int
+* 3 - string
+* 4 - bool
+* arg $str is used when returning 1
+*/
+function getFrame(&$frame, $is_type) {
     $frame = skipWhite();
 
-    // LF, TF or GF
-    if ($frame == "L" || $frame == "T" || $frame == "G") {
-        $tmp = fgetc(STDIN);
-        if ($tmp == "F")
-            $frame.=$tmp;
+    if (strcmp($frame, "L") == 0 || strcmp($frame, "T") == 0 || strcmp($frame, "G") == 0) {
+
+        if (strcmp(fgetc(STDIN), "F") == 0)
+            $frame.="F";
         else
-            return ERR;
+            terminate(21, "Invalid frame name.");
+
+        if (strcmp(fgetc(STDIN), "@") != 0)
+            terminate(21, "@ expected.");
+        else {
+            $frame."@";
+            return 1;
+        }
     }
-    else
-        return ERR;
+    
+    if (ctype_lower($frame)) {
+        $c;
+        while ($c = fgetc(STDIN)) {
+            if (ctype_lower($c))
+                $frame.=$c;
+            else
+                break;
+        }
 
-    // @ check
-    if (fgetc(STDIN) != "@")
-        return ERR;
+        if (strcmp($c, "@") != 0 && $is_type == false)
+            terminate(21, "@ expected.");
 
-    return $frame."@";
+        if (strcmp($frame, "int") == 0)
+            return 2;
+        if (strcmp($frame, "string") == 0)
+            return 3;
+        if (strcmp($frame, "bool") == 0)
+            return 4;
+    }
+    terminate(21, "Unknown type of symbol.");
 }
 
 // Variable or label
 function getVarLab($end, $is_var) {
-    if ($is_var == true)
-        $str = getFrame();
-    else 
+    if ($is_var == true) {
+        $frame;
+        $is_frame = getFrame($frame, false);   
+    }
+    else
         $str = "";
 
-    if ($str == ERR)
-        return ERR;
+    if ($is_frame != 1)
+        terminate(21, "Variable name expected.");
 
     // Must start with alpha or special
     $c = fgetc(STDIN);
-    if (ctype_alpha($c) || $c == "_" || $c == "-" || $c == "$" || $c == "&" || $c == "%" || $c == "*")
+    if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)
         $str.=$c;
     else
-        return -1;
+        terminate(21, "Wrong variable name.");
 
     while ($c = fgetc(STDIN)) {
-
-        if (ctype_alnum($c) || $c == "_" || $c == "-" || $c == "$" || $c == "&" || $c == "%" || $c == "*") {
+        if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {
             $str.=$c;
             continue;
         }
-        if ($c == " " || $c == "\t") {
+        if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
             break;
-        }
-        if ($c == "\n" && $end == true) {
+        if (strcmp($c, "\n") == 0 && $end == true)
             break;
-        }
-        else {
-            return ERR;
-        }
+        else
+            terminate(21, "Wrong variable name.");            
     }
     return $str;
 }
 
 
 function getTyp($end) {
-    $type = skipWhite();
-    while ($c = fgetc(STDIN)) {
-        if (ctype_alpha($c)) {
-            $type.=$c;
-            continue;    
+    $tmp;
+    $type = getFrame($frame, true); 
+    if (getFrame($frame, true) != 1) {
+        // read to end of line
+        if ($end == true) {
+            if (ctype_space(fgets(STDIN)) != 1)
+                terminate(21, "Invalid arguments of instruction.");
         }
-        if ($c == " " || $c == "\t")
-            break;
-        if ($c == "\n" && $end == true)
-            break;
-        else
-            return ERR;
+        else {
+            $c = fgetc(STDIN);
+            if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
+                switch (variable) {
+                    case 'value':
+                        # code...
+                        break;
+                    
+                    default:
+                        # code...
+                        break;
+                }
+            }
+        }
     }
-
-    if (strcmp($type, "int") == 0 || strcmp($type, "string") == 0 || strcmp($type, "bool") == 0)
-        return $type;
-    else
-        return ERR;
 }
 
 function getInst() {
