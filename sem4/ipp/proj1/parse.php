@@ -1,6 +1,7 @@
 <?php
 /*******************CONSTANTS DEFINITIONS********************/
 const ARG_ERR = 10;
+const SYN_ERR = 21;
 const EOF = -1;
 const ERR = -2;
 
@@ -8,6 +9,8 @@ const ERR = -2;
 $params;
 $file;
 $stats = $comments = $loc = false;
+$line_count = 1;
+$comment_count = 0;
 
 /********************ARRAYS FOR INSTRUCTIONS*****************/
 /**
@@ -62,30 +65,33 @@ $all_inst = array(
 /*********************FUNCTION DEFS************************/
 
 function terminate($code, $str) {
-    fwrite(STDERR, $str."\n");
+    fwrite(STDERR, "Error found in line ".$line_count."!\n".$str."\n");
     exit($code);
 }
 
 // Skip white characters
 function skipWhite() {
-    $char;
+    $c;
     while (true) {
         if (feof(STDIN))
             return EOF;
 
-        $char = fgetc(STDIN);
+        $c = fgetc(STDIN);
 
-        if (strcmp($char, "#") == 0) {
+        if (strcmp($c, chr(35)) == 0) {
+            $comment_count++;
+            $line_count++;
             fgets(STDIN);
             continue;
         }
-        if (strcmp($char, "\n") == 0)
+        if (strcmp($c, "\n") == 0) {
+            $line_count++;
             return "\n";
-
-        if (ctype_space($char))
+        }
+        if (ctype_space($c))
             continue;
         else
-            return $char;
+            return $c;
     }
 }
 
@@ -105,7 +111,7 @@ function getEscape() {
             return $number;
     }
     else
-        terminate(21, "Escape sequence expected.");
+        terminate(SYN_ERR, "Escape sequence expected.");
 }
 
 // Read string
@@ -114,7 +120,11 @@ function getString($end) {
     $str = "";
 
     while($c = fgetc(STDIN)) {
-        if (((strcmp($c, "\n") == 0) && $end) || (strcmp($c, " ") == 0) || (strcmp($c, "\t") == 0))
+        if (((strcmp($c, "\n") == 0) && $end)) {
+            $line_count++;
+            break;
+        }
+        if ((strcmp($c, " ") == 0) || (strcmp($c, "\t") == 0))
             break;
         if (strcmp($c, chr(92)) == 0) {
             $tmp = getEscape();
@@ -123,12 +133,16 @@ function getString($end) {
             continue;
         }
         // Comment
-        if (strcmp($c, chr(35)) == 0) {
+        if (strcmp($c, chr(35)) == 0 && $end) {
             fgets(STDIN);
+            $comment_count++;
+            $line_count++;
             break;
         }
         if (ctype_print($c))
             $str.=$c;
+        else
+            terminate(SYN_ERR, "Invalid string.");
     }
     return $str;
 }
@@ -142,7 +156,7 @@ function getInt($end) {
     if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)
         $number = $c;
     else
-        terminate(21, "Invalid int.");
+        terminate(SYN_ERR, "Invalid int.");
 
     while ($c = fgetc(STDIN)) {
         if (is_numeric($c))
@@ -151,16 +165,26 @@ function getInt($end) {
             break;
     }
 
-    if ((strcmp($c, "\n") == 0 && $end) || strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+    if ((strcmp($c, "\n") == 0 && $end)) {
+        $line_count++;
         return $number;
-    else
-        terminate(21, "Invalid int.");
+    }
+    else if (strcmp($c, chr(35)) == 0 && $end) {
+        fgets(STDIN);
+        $comment_count++;
+        $line_count++;
+        return $number;
+    }
+    if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+        return $number;
+
+    terminate(SYN_ERR, "Invalid int.");
 }
 
 // Constant or variable
 function getSymb($end, &$type) {
     $frame;
-    $type = getFrame($frame, false);
+    $type = getFrame($frame, false, $end);
 
     switch ($type) {
         case 1:
@@ -178,14 +202,27 @@ function getSymb($end, &$type) {
             while ($c = fgetc(STDIN)) {
                 if (ctype_lower($c))
                     $tmp.=$c;
-                else
+                else if ((strcmp($c, "\n") == 0 && $end)) {
+                    $line_count++;
                     break;
+                }
+                else if (strcmp($c, chr(35)) == 0 && $end) {
+                    fgets(STDIN);
+                    $comment_count++;
+                    $line_count++;
+                }
+                else if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+                    break;
+                else
+                    terminate(SYN_ERR, "Invalid bool value.");
             }
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
+            else
+                terminate(SYN_ERR, "Invalid bool value.");
             break;
         default:
-            terminate(21, "Unknown error.");
+            terminate(SYN_ERR, "Unknown error.");
             break;
     }
 }
@@ -198,7 +235,7 @@ function getSymb($end, &$type) {
 * 4 - bool
 * arg $str is used when returning 1
 */
-function getFrame(&$frame, $is_type) {
+function getFrame(&$frame, $is_type, $end) {
     $frame = skipWhite();
 
     if (strcmp($frame, "L") == 0 || strcmp($frame, "T") == 0 || strcmp($frame, "G") == 0) {
@@ -206,12 +243,12 @@ function getFrame(&$frame, $is_type) {
         if (strcmp(fgetc(STDIN), "F") == 0)
             $frame.="F";
         else
-            terminate(21, "Invalid frame name.");
+            terminate(SYN_ERR, "Invalid frame name.");
 
         if (strcmp(fgetc(STDIN), "@") != 0)
-            terminate(21, "@ expected.");
+            terminate(SYN_ERR, "@ expected.");
         else {
-            $frame."@";
+            $frame.="@";
             return 1;
         }
     }
@@ -226,7 +263,21 @@ function getFrame(&$frame, $is_type) {
         }
 
         if (strcmp($c, "@") != 0 && $is_type == false)
-            terminate(21, "@ expected.");
+            terminate(SYN_ERR, "@ expected.");
+
+        if ($is_type == true) {
+            if (strcmp($c, "\n") == 0 && $end)
+                $line_count++;
+            else if ((strcmp($c, "\t") == 0 || strcmp($c, " ") == 0))
+                //
+            else if (strcmp($c, chr(35)) == 0 && $end) {
+                fgets(STDIN);
+                $comment_count++;
+                $line_count++;
+            }
+            else
+                terminate(SYN_ERR, "Unknown type.");
+        }   
 
         if (strcmp($frame, "int") == 0)
             return 2;
@@ -235,7 +286,7 @@ function getFrame(&$frame, $is_type) {
         if (strcmp($frame, "bool") == 0)
             return 4;
     }
-    terminate(21, "Unknown type of symbol.");
+    terminate(SYN_ERR, "Unknown type of symbol.");
 }
 
 // Variable or label
@@ -243,10 +294,10 @@ function getVarLab($end, $is_var) {
     $str = "";
 
     if ($is_var == true) {
-        $is_frame = getFrame($str, false);
+        $is_frame = getFrame($str, false, $end);
 
         if ($is_frame != 1)
-            terminate(21, "Variable name expected.");
+            terminate(SYN_ERR, "Variable name expected.");
         $str.="@";
     }
  
@@ -255,7 +306,7 @@ function getVarLab($end, $is_var) {
     if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)
         $str.=$c;
     else
-        terminate(21, "Wrong variable name.");
+        terminate(SYN_ERR, "Wrong variable name.");
 
     while ($c = fgetc(STDIN)) {
         if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {
@@ -264,10 +315,18 @@ function getVarLab($end, $is_var) {
         }
         if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
             break;
-        if (strcmp($c, "\n") == 0 && $end == true)
+        if (strcmp($c, "\n") == 0 && $end == true) {
+            $line_count++;
             break;
+        }
+        if (strcmp($c, chr(35)) == 0 && $end) {
+                fgets(STDIN);
+                $comment_count++;
+                $line_count++;
+                break;
+        }
         else
-            terminate(21, "Wrong variable name.");            
+            terminate(SYN_ERR, "Wrong variable name.");            
     }
     return $str;
 }
@@ -275,11 +334,11 @@ function getVarLab($end, $is_var) {
 
 function getTyp($end) {
     $frame;
-    $type = getFrame($frame, true); 
+    $type = getFrame($frame, true, $end); 
     if ($type != 1)
         return $frame;
 
-    terminate(21, "Type expected.");
+    terminate(SYN_ERR, "Type expected.");
 }
 
 function getInst() {
@@ -292,26 +351,45 @@ function getInst() {
         return EOF;
 
     global $all_inst;
+
     $c;
+    $no_arg = false;
 
     while ($c = fgetc(STDIN)) {
-        if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0){
+        if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
+            break;
+        }
+        if (strcmp($c, "\n") == 0) {
+            $line_count++
+            $no_arg = true;
+        }
+        if (strcmp($c, chr(35)) == 0) {
+            fgets(STDIN);
+            $comment_count++;
+            $line_count++;
+            $no_arg = true;
             break;
         }
         if (ctype_alnum($c))
             $op_code.=$c;
         else
-            terminate(21, "Unknown instruction");
+            terminate(SYN_ERR, "Unknown instruction");
     }
     // Case insentive
     $op_code = strtolower($op_code);
 
     foreach ($all_inst as $key => $value) {
-        if (strcmp($key, $op_code) == 0)
+        if (strcmp($key, $op_code) == 0) {
+            // \n or # after operation code
+            if ($no_arg == true) {
+                if (count($all_inst[$key]) != 0)
+                    terminate(SYN_ERR, "Argument(s) expected.");
+            }
             return $op_code;
+        }
     }
     // Unknown operation code
-    terminate(21, "Unknown instruction");
+    terminate(SYN_ERR, "Unknown instruction");
 }
 
 function argHandle() {
@@ -324,7 +402,7 @@ function argHandle() {
     $params = getopt("", $options);
 
     if ($params == false) {
-        terminate(10, "Wrong arguments, try --help.");
+        terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
 
     if ($argc == 2) {
@@ -344,11 +422,11 @@ function argHandle() {
             $file = $params["file"];
         }
         else
-            terminate(10, "Wrong arguments, try --help.");
+            terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 3) {
         if (isset($params["help"]))
-            terminate(10, "Wrong arguments, try --help.");
+            terminate(ARG_ERR, "Wrong arguments, try --help.");
         if (isset($params["file"])) {
             $stats = true;
             $file = $params["file"];
@@ -360,14 +438,14 @@ function argHandle() {
     }
     else if ($argc == 4) {
         if (isset($params["help"]))
-            terminate(10, "Wrong arguments, try --help.");
+            terminate(ARG_ERR, "Wrong arguments, try --help.");
         $stats = true;
         $file = $params["file"];
         $loc = true;
         $comments = true;
     }
     else
-        terminate(10, "Wrong arguments, try --help.");
+        terminate(ARG_ERR, "Wrong arguments, try --help.");
 }
 
 function main() {
@@ -379,7 +457,7 @@ function main() {
     $tmp = $tmp.rtrim(strtolower(fgets(STDIN)));
 
     if (strcmp($tmp, ".ippcode18") != 0)
-        terminate(21, ".IPPcode18 is missing!");
+        terminate(SYN_ERR, ".IPPcode18 is missing!");
 
     // Basic XML string
 $xml_str = <<<XML
@@ -390,28 +468,34 @@ XML;
     
     $xml_el = new SimpleXMLElement($xml_str);
 
-    // Instruction counter
-    $inst_count = 0;
+    global $inst_count, $all_inst, $line_count;
 
-    global $all_inst;
     // $end signalize last parameter
-        $end;
+    $end;
+
+    $actual_line;
 
     // Repeat until error or EOF
     while (true) {
-        $var = getInst();
+        $op_code = getInst();
         // End of file
-        if ($var == EOF)
+        if ($op_code == EOF)
             break;
 
-        $inst_count++;        
+        $inst_count++;
 
         $xml_inst = $xml_el->addChild("instruction");
         $xml_inst->addAttribute("order", $inst_count);
-        $xml_inst->addAttribute("opcode", strtoupper($var));  
+        $xml_inst->addAttribute("opcode", strtoupper($op_code));
 
-        foreach ($all_inst[$var] as $key => $value) {
-            if (count($all_inst[$var]) == ($key + 1)) 
+        // For instrucions without arguments
+        if (count($all_inst[$op_code]) == 0)
+            continue;
+
+        $actual_line = $line_count;
+
+        foreach ($all_inst[$op_code] as $key => $value) {
+            if (count($all_inst[$op_code]) == ($key + 1)) 
                 $end = true;
             else
                 $end = false;
@@ -459,6 +543,28 @@ XML;
                     break;
             }
         }
+        // Check for valid format
+        if (($line_count - $actual_line) == 0) {
+            $c;
+            while ($c = fgetc(STDIN)) {
+                if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0)
+                    continue;
+                if (strcmp($c, chr(35)) == 0) {
+                    fgets(STDIN);
+                    $comment_count++;
+                    $line_count++;
+                    break;
+                }
+                if (strcmp($c, "\n") == 0) {
+                    $line_count++;
+                    break;
+                }
+                else
+                    terminate(SYN_ERR, "End of line expected.");
+            }
+        }
+        else if (($line_count - $actual_line) != 1)
+            terminate(SYN_ERR, "Instruction on multiple lines.");
     }
     
     print $xml_el->asXml();
