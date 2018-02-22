@@ -4,6 +4,11 @@ const ARG_ERR = 10;
 const EOF = -1;
 const ERR = -2;
 
+/******************GLOBAL VARIABLES**************************/
+$params;
+$file;
+$stats = $comments = $loc = false;
+
 /********************ARRAYS FOR INSTRUCTIONS*****************/
 /**
 * All instructions 
@@ -309,23 +314,66 @@ function getInst() {
     terminate(21, "Unknown instruction");
 }
 
-function main() {
+function argHandle() {
+    global $argc, $params, $stats, $file, $comments, $loc;
+    // No arguments
+    if ($argc == 1)
+        return;
 
-    // Arguments check
-    global $argc;
-    global $argv;
-    
-    if ($argc > 1) {
-        if ($argv[1] == '--help') {
-            print "show passed\n";
-            return 0;
-        }
-        else {
-            fwrite(STDERR, "Unknown arguments!\n");
-            return 10;
-        }
+    $options = array("help", "file:", "comments", "loc");
+    $params = getopt("", $options);
+
+    if ($params == false) {
+        terminate(10, "Wrong arguments, try --help.");
     }
-    
+
+    if ($argc == 2) {
+        if (isset($params["help"])) {
+            print ( "Usage:\n".
+                    "   php5.6 parse.php\n".
+                    "   php5.6 parse.php --help\n".
+                    "   php5.6 parse.php --stats=file [--loc] [--comments]\n\n".
+                    "   --help       This help\n".
+                    "   --stats=file Statistics about source file are logged to given file\n".
+                    "   --loc        Number of lines with instructions are logged\n".
+                    "   --comments   Number of lines with comments are logged\n");
+            exit(0);
+        }
+        else if (isset($params["file"])) {
+            $stats = true;
+            $file = $params["file"];
+        }
+        else
+            terminate(10, "Wrong arguments, try --help.");
+    }
+    else if ($argc == 3) {
+        if (isset($params["help"]))
+            terminate(10, "Wrong arguments, try --help.");
+        if (isset($params["file"])) {
+            $stats = true;
+            $file = $params["file"];
+        }
+        if (isset($params["comments"]))
+            $comments = true;
+        else
+            $loc = true;
+    }
+    else if ($argc == 4) {
+        if (isset($params["help"]))
+            terminate(10, "Wrong arguments, try --help.");
+        $stats = true;
+        $file = $params["file"];
+        $loc = true;
+        $comments = true;
+    }
+    else
+        terminate(10, "Wrong arguments, try --help.");
+}
+
+function main() {
+    // Arguments check
+    argHandle();
+
     // First line check
     $tmp = skipWhite();
     $tmp = $tmp.rtrim(strtolower(fgets(STDIN)));
@@ -410,7 +458,6 @@ XML;
                     // WTF
                     break;
             }
-           // echo $xml_el->asXml();
         }
     }
     
