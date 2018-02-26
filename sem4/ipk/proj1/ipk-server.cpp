@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <regex>
 #include <ctype.h>
+#include <cerrno>           // For debugging
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -11,32 +12,66 @@
 
 using namespace std;
 
+void parseReq(string req_message) {
+    switch(req_message[0]) {
+        case '1':
+            break;
+        case '2':
+            break;
+        case '3':
+            break;
+        default:
+            ERR_RET("Invalid request from client!");
+    }
+}
+
 void listen(string port) {
 
-    int client_socket;
-    struct sockaddr_in address;
-    struct hostent* server;
+    int server_socket;
 
-    bzero((char *) &address, sizeof(address));
-    address.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, (char *)&address.sin_addr.s_addr, server->h_length);
-    address.sin_port = htonl(stoul(info.port, NULL, 10));
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    // Create and set socket
+    if((server_socket = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
+        ERR_RET("Socket error!");
+    }
+    //int optval = 1;
+    //setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
 
-    // Create socket
-    if(client_socket = socket(AF_INET, SOCK_STREAM, 0) <= 0) {
-        ERR_RET("Socket error!")
+    // Bind
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_address.sin_port = htons(stoul(port, NULL, 10));
+
+    int rc;
+    if ((rc = bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
+        cout << strerror(errno) << endl;
+        ERR_RET("Binding error!");
     }
 
-    memset(&sa,0,sizeof(sa));
-sa.sin6_family = AF_INET6;
-sa.sin6_addr = in6addr_any;
-sa.sin6_port = htons(port_number);
-if ((rc = bind(welcome_socket, (struct sockaddr*)&sa, sizeof(sa))) < 0)
-{
-perror("ERROR: bind");
-exit(EXIT_FAILURE);
-}
+    if ((listen(server_socket, 1)) < 0) {
+        ERR_RET("Listen error!");
+    }
+    size_t len = sizeof(server_address);
+    while(true) {
+        int comm_socket = accept(server_socket, (struct sockaddr*)&server_address, (socklen_t*)&len);
+        
+        if (comm_socket > 0) {
+            char buff[1024];
+            int res = 0;
+
+            while(true) {
+                if ((res = recv(comm_socket, buff, 1024, 0)) < 0) {
+                    ERR_RET("Error receiving from client!");
+                }
+                send(comm_socket, "abcd", 4, 0);
+                if (res < 1024) {
+                    break;
+                }
+                
+            }
+        }
+    }
 }
 
 int main(int argc, char const *argv[]) {

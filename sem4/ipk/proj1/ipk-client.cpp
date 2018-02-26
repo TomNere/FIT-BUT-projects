@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <regex>
 #include <ctype.h>
+#include <cerrno>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -96,14 +97,14 @@ void request(InputInfo info) {
     bzero((char *) &address, sizeof(address));
     address.sin_family = AF_INET;
     bcopy((char *)server->h_addr, (char *)&address.sin_addr.s_addr, server->h_length);
-    address.sin_port = htonl(stoul(info.port, NULL, 10));
+    address.sin_port = htons(stoul(info.port, NULL, 10));
 
     // Create socket
-    if(client_socket = socket(AF_INET, SOCK_STREAM, 0) <= 0) {
+    if((client_socket = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
         ERR_RET("Socket error!")
     }
     // Connect
-    if (connect(client_socket, (const struct sockaddr *)&address, sizeof(address)) != 0) {
+    if ((connect(client_socket, (const struct sockaddr *)&address, sizeof(address))) != 0) {
         ERR_RET("Connection error!");
     }
     // Send request
@@ -113,20 +114,23 @@ void request(InputInfo info) {
     }
 
     int bytesrx;
-    size_t BUFSIZE = 100;
+    size_t BUFSIZE = 1024;
     char buffer[BUFSIZE];
     string received = "";
 
     // Receive data
     while((bytesrx = recv(client_socket, buffer, BUFSIZE, 0)) > 0) {
         received.append(string(buffer) + "\n");
+        if (bytesrx < BUFSIZE) {
+            break;
+        }
     }
     if (bytesrx < 0) {
         ERR_RET("Receive error!");
     }
-
-    close(client_socket);
     cout << received;
+    close(client_socket);
+    
 }
 
 int main(int argc, char const *argv[])
