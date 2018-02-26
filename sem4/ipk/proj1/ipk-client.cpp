@@ -13,7 +13,7 @@ using namespace std;
 
 class InputInfo {
     public: 
-    string host, port, login;
+    string host, port, login, req_message;
 
     /* This int signalize which argument was selected
     * n - 1
@@ -26,7 +26,7 @@ class InputInfo {
     bool h_flag, p_flag;
 
     void initialize() {
-        host = port = login = "";
+        host = req_message = port = login = "";
         req_type = 0;
         h_flag = p_flag = false;
     }
@@ -77,12 +77,16 @@ class InputInfo {
                 ERR_RET("Missing parameters!");       
             }
         }
+        if (!login.compare("")) {
+            login = "-";
+        }
+        req_message = to_string(req_type) + "&" + login; 
     }
 };
 
 // send request to the server
 void request(InputInfo info) {
-    int my_socket;
+    int client_socket;
     struct sockaddr_in address;
     struct hostent* server;
 
@@ -95,14 +99,34 @@ void request(InputInfo info) {
     address.sin_port = htonl(stoul(info.port, NULL, 10));
 
     // Create socket
-    if(my_socket = socket(AF_INET, SOCK_STREAM, 0) <= 0) {
+    if(client_socket = socket(AF_INET, SOCK_STREAM, 0) <= 0) {
         ERR_RET("Socket error!")
     }
     // Connect
-    if (connect(my_socket, (const struct sockaddr *)&address, sizeof(address)) != 0) {
+    if (connect(client_socket, (const struct sockaddr *)&address, sizeof(address)) != 0) {
         ERR_RET("Connection error!");
     }
+    // Send request
+    int bytestx = send(client_socket, info.req_message.c_str(), strlen(info.req_message.c_str()), 0);
+    if (bytestx < 0) {
+        ERR_RET("Send error!");   
+    }
 
+    int bytesrx;
+    size_t BUFSIZE = 100;
+    char buffer[BUFSIZE];
+    string received = "";
+
+    // Receive data
+    while((bytesrx = recv(client_socket, buffer, BUFSIZE, 0)) > 0) {
+        received.append(string(buffer) + "\n");
+    }
+    if (bytesrx < 0) {
+        ERR_RET("Receive error!");
+    }
+
+    close(client_socket);
+    cout << received;
 }
 
 int main(int argc, char const *argv[])
@@ -155,6 +179,7 @@ int main(int argc, char const *argv[])
     }
 
     info.validate();
+    request(info);
 
     return 0;
 }
