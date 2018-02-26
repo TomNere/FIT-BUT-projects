@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <fstream>
 #include <unistd.h>
 #include <regex>
 #include <ctype.h>
@@ -12,9 +13,26 @@
 
 using namespace std;
 
-void parseReq(string req_message) {
+string parseReq(string req_message) {
+    ifstream file;
+    file.open("/etc/passwd");
+    string line;
+
     switch(req_message[0]) {
         case '1':
+            while(getline(file, line)) {
+                if (line.find(req_message.substr(2)) != string::npos) {
+                    int index;
+                    for(int i = 1; i <= 4; i++) {
+                        if(line.find(":") == string::npos) {
+                            break;
+                        }
+                        line.erase(line.find(":"));
+                    }
+                    file.close();
+                    return (line.substr(0, line.find(":")) + "\0");
+                }
+            }
             break;
         case '2':
             break;
@@ -64,7 +82,9 @@ void listen(string port) {
                 if ((res = recv(comm_socket, buff, 1024, 0)) < 0) {
                     ERR_RET("Error receiving from client!");
                 }
-                send(comm_socket, "abcd", 4, 0);
+                const char* sent_buff = parseReq(string(buff)).c_str();
+                //cout << string(sent_buff) << endl;
+                send(comm_socket, sent_buff, strlen(sent_buff), 0);
                 if (res < 1024) {
                     break;
                 }
