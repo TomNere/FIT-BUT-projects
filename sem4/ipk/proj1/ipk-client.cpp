@@ -1,5 +1,5 @@
 #include <iostream>
-#include <cstring>
+#include <string>
 #include <unistd.h>
 #include <regex>
 #include <ctype.h>
@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include "ipk-client.h"
+#include "ipk.h"
 
 using namespace std;
 
