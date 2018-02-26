@@ -4,6 +4,9 @@
 #include <regex>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include "ipk-client.h"
 
 using namespace std;
@@ -39,7 +42,7 @@ class InputInfo {
 
     void validate() {
         if (!host.compare("") || !port.compare("")) {
-            ERR_RET("Invalid parameters!");
+            ERR_RET("Missing parameters!");
         }
         // Host check
         if (isdigit(host[0])) {
@@ -64,8 +67,43 @@ class InputInfo {
         else {
             ERR_RET("Invalid port!");
         }
+        if (req_type == 0) {
+            ERR_RET("Missing parameters!");
+        }
+
+        // login is needed
+        if (req_type != 3) {
+            if(!login.compare("")) {
+                ERR_RET("Missing parameters!");       
+            }
+        }
     }
 };
+
+// send request to the server
+void request(InputInfo info) {
+    int my_socket;
+    struct sockaddr_in address;
+    struct hostent* server;
+
+    if ((server = gethostbyname(info.host.c_str())) == NULL) {
+        ERR_RET("Host not found!");
+    }
+    bzero((char *) &address, sizeof(address));
+    address.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&address.sin_addr.s_addr, server->h_length);
+    address.sin_port = htonl(stoul(info.port, NULL, 10));
+
+    // Create socket
+    if(my_socket = socket(AF_INET, SOCK_STREAM, 0) <= 0) {
+        ERR_RET("Socket error!")
+    }
+    // Connect
+    if (connect(my_socket, (const struct sockaddr *)&address, sizeof(address)) != 0) {
+        ERR_RET("Connection error!");
+    }
+
+}
 
 int main(int argc, char const *argv[])
 {
@@ -89,25 +127,27 @@ int main(int argc, char const *argv[])
                 info.port = optarg;
                 break;
             case 'n':
-                if (info.req_type == 0) {
+                if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 1;
                 info.login = optarg;
                 break;
             case 'f':
-                if (info.req_type == 0) {
+                if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 2;
                 info.login = optarg;
                 break;
             case 'l':
-                if (info.req_type == 0) {
+                if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 3;
-                info.login = optarg;
+                if (optarg != NULL) {
+                    info.login = optarg;    
+                }
                 break;
             default:
                 ERR_RET("Invalid parameters!");
