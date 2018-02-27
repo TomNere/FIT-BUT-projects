@@ -108,27 +108,26 @@ void request(InputInfo info) {
         ERR_RET("Connection error!");
     }
     // Send request
-    int bytestx = send(client_socket, info.req_message.c_str(), strlen(info.req_message.c_str()), 0);
+    int bytestx = send(client_socket, info.req_message.c_str(), info.req_message.length(), 0);
     if (bytestx < 0) {
         ERR_RET("Send error!");   
     }
 
     int bytesrx;
-    size_t BUFSIZE = 1024;
-    char buffer[BUFSIZE];
-    string received = "";
+    char buff[1024];
+    string received_msg = "";
 
     // Receive data
-    while((bytesrx = recv(client_socket, buffer, BUFSIZE, 0)) > 0) {
-        received.append(string(buffer) + "\n");
-        if (bytesrx < BUFSIZE) {
+    while((bytesrx = recv(client_socket, buff, 1024, 0)) > 0) {
+        received_msg.append(string(buff));
+        if (bytesrx < 1024) {
             break;
         }
     }
     if (bytesrx < 0) {
         ERR_RET("Receive error!");
     }
-    cout << received;
+    cout << received_msg << endl;
     close(client_socket);
     
 }

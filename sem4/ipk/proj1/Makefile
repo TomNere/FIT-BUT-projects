@@ -1,7 +1,9 @@
-all: build
+all: client server
 
-build: 
+client: 
 	g++ ipk-client.cpp ipk.h -o ipk-client
+	
+server:
 	g++ ipk-server.cpp ipk.h -o ipk-server
 
 clean:

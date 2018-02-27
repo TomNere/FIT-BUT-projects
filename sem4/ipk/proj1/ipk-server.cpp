@@ -77,18 +77,32 @@ void listen(string port) {
         if (comm_socket > 0) {
             char buff[1024];
             int res = 0;
+            string received_request = "";
 
             while(true) {
                 if ((res = recv(comm_socket, buff, 1024, 0)) < 0) {
                     ERR_RET("Error receiving from client!");
                 }
-                const char* sent_buff = parseReq(string(buff)).c_str();
-                //cout << string(sent_buff) << endl;
-                send(comm_socket, sent_buff, strlen(sent_buff), 0);
+                received_request = received_request + string(buff);
                 if (res < 1024) {
                     break;
                 }
-                
+            }
+            string data_to_send = parseReq(received_request);
+            size_t size_to_send = data_to_send.length();
+            string tmp = "";
+            while(size_to_send) {
+                // Notice \0 character at the end of C-style string
+                if (size_to_send > 1024) {
+                    tmp = data_to_send.substr(0, 1023);
+                    data_to_send.erase(1023);
+                    size_to_send = size_to_send - 1023;
+                }
+                else {
+                    tmp = data_to_send;
+                    size_to_send = 0;
+                }
+                send(comm_socket, tmp.c_str(), tmp.length() + 1, 0);
             }
         }
     }
