@@ -18,7 +18,7 @@ $params;
 $file;
 $stats = false;
 $line_count = 1;
-$comment_count = 0;
+$comment_count = $inst_count = 0;
 
 /** Array of all instructions 
 * KEY - operation code
@@ -114,7 +114,7 @@ function skipComment() {
 *              - false if not
 */
 function nlcCheck($c) {
-    if ((strcmp($c, "\n") == 0) {
+    if (strcmp($c, "\n") == 0) {
         $GLOBALS['line_count']++;
         return true;
     }
@@ -149,15 +149,15 @@ function getString() {
         if (nlcCheck($c))                                       // End of string
             break;
         if (strcmp($c, chr(92)) == 0) {                         // Escape sequence
-            $str = $STR.Tchr(92).getEscape();
+            $str = $str.chr(92).getEscape();
             continue;
         }
-        if (!ctype_space())
+        if (!ctype_space($c))
             $str.=$c;
         else
             terminate(SYN_ERR, "Invalid string.");              // Some invalid character
     }
-    return (htmlspecialchars($str, ENT_XML1, 'UTF-8');          // Translate XML special characters
+    return (htmlspecialchars($str, ENT_XML1, 'UTF-8'));          // Translate XML special characters
 }
 
 /** Read integer constant
@@ -240,7 +240,7 @@ function getFrame(&$frame, $is_type) {
     $frame = $frame.fgets(STDIN, 3);               // Get next 2 characters
 
     if (preg_match("/[G|L|T|]F@/", $frame))        // GF@ LF@ or TF@
-            return 1;
+        return 1;
     
     if (ctype_lower($frame)) {                     // Possible type name
         $c;
@@ -265,7 +265,7 @@ function getFrame(&$frame, $is_type) {
             return 3;
         if (strcmp($frame, "bool") == 0)
             return 4;
-
+    }
     terminate(SYN_ERR, "Unknown type of symbol.");
 }
 
@@ -284,16 +284,12 @@ function getVarLab($is_var) {
  
     $c = fgetc(STDIN);
     if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)  // Name has to start with alpha or special character
-        if (strcmp($c, "&") == 0)                                   // Special XML character
-            $c = "&amp;";
         $str.=$c;
     else
         terminate(SYN_ERR, "Wrong variable name.");
 
     while ($c = fgetc(STDIN)) {
         if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {    // Next characters could be alfanumeric or special
-            if (strcmp($c, "&") == 0)                                       // Special XML character
-                $c = "&amp;";
             $str.=$c;
             continue;
         }
@@ -302,8 +298,9 @@ function getVarLab($is_var) {
         else
             terminate(SYN_ERR, "Wrong variable name.");            
     }
-    return $str;
+    return (htmlspecialchars($str, ENT_XML1, 'UTF-8'));          // Translate XML special character &
 }
+
 /** Check for valid operation code
 * return value - string containing opcode
 */
@@ -326,7 +323,7 @@ function getInst() {
             break;
         }
         if (nlcCheck($c)) {                                     // Operation code must not have arguments
-            $no_arg = true
+            $no_arg = true;
             break;
         }
         if (ctype_alnum($c))
@@ -399,7 +396,7 @@ function argHandle() {
             terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 3) {
-        if (isset($params["stats"]) && (isset($params["loc"]) || isset($params["comment"]))) {
+        if (isset($params["stats"]) && (isset($params["loc"]) || isset($params["comments"]))) {
             $stats = true;
             $file = $params["stats"];
         }
@@ -407,7 +404,7 @@ function argHandle() {
             terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 4) {
-        if (!isset($params["stats"]) || !isset($params["loc"]) || !isset($params["comment"]))
+        if (!isset($params["stats"]) || !isset($params["loc"]) || !isset($params["comments"]))
             terminate(ARG_ERR, "Wrong arguments, try --help.");
         $stats = true;
         $file = $params["stats"];
@@ -471,13 +468,13 @@ while (true) {                      // Repeat until error or EOF
                 terminate(SYN_ERR, "Unknown error.");
                 break;
         }
-        if ((count($all_inst[$op_code]) > ($key + 1)) && ($line_count - $actual_line) != 0))
+        if ((count($all_inst[$op_code]) > ($key + 1)) && (($line_count - $actual_line) != 0))
             terminate(SYN_ERR, "Missing argument(s).");
     }
 
-    if (($line_count - $actual_line) == 0) {                // Check for new line after arguments
+    if (($line_count - $actual_line) == 0) {                    // Check for new line after arguments
         $c = skipWhite();
-        if (strcmp($c, "\n") && strcmp($c, "#"))            // Unexpected character after arguments
+        if (strcmp($c, "\n") && strcmp($c, "#") && $c != EOF)   // Unexpected character after arguments
             terminate(SYN_ERR, "Unexpected argument(s).");    
     }
     else if (($line_count - $actual_line) != 1)
@@ -486,4 +483,5 @@ while (true) {                      // Repeat until error or EOF
 
 extension();
 print $xml_el->asXml();
+
 ?>
