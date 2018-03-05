@@ -1,22 +1,28 @@
 <?php
-/*******************CONSTANTS DEFINITIONS********************/
+/**
+*  Course:      Principles of Programming Languages (IPP)
+*  Project:     Implementation of the IPPcode18 imperative language interpreter
+*  File:        parse.php
+*
+*  Author: Tomáš Nereča : xnerec00
+*/
+
+/************************CONSTANTS**************************/
 const ARG_ERR = 10;
 const SYN_ERR = 21;
 const EOF = -1;
 const ERR = -2;
 
-/******************GLOBAL VARIABLES**************************/
+/**********************GLOBAL VARIABLES*********************/
 $params;
 $file;
 $stats = false;
 $line_count = 1;
 $comment_count = 0;
 
-/********************ARRAYS FOR INSTRUCTIONS*****************/
-/**
-* All instructions 
+/** Array of all instructions 
 * KEY - operation code
-* VALUE - array of parameters
+* VALUE - array of parameters:
 * 1 - variable
 * 2 - label
 * 3 - symb
@@ -62,8 +68,10 @@ $all_inst = array(
     "jumpifneq" => array(2, 3, 3)
 );
 
-/*********************FUNCTION DEFS************************/
-
+/** Write error message and exit
+* $code - exit code
+* $str - error message
+*/
 function terminate($code, $str) {
     global $line_count;
     if ($code == SYN_ERR)
@@ -72,160 +80,149 @@ function terminate($code, $str) {
     exit($code);
 }
 
-// Skip white characters
+/** Skip all white characters
+* return value - first non-white character or EOF
+*/
 function skipWhite() {
-    global $line_count, $comment_count;
     $c;
-    while (true) {
-        if (feof(STDIN))
-            return EOF;
-
-        $c = fgetc(STDIN);
-
-        if (strcmp($c, chr(35)) == 0) {
-            $comment_count++;
-            $line_count++;
-            fgets(STDIN);
-            continue;
+    while ($c = fgetc(STDIN)) {                 // Repeat until EOF
+        if (strcmp($c, chr(35)) == 0) {         // # - comment
+            skipComment();
+            return "#";
         }
-        if (strcmp($c, "\n") == 0) {
-            $line_count++;
+        else if (strcmp($c, "\n") == 0) {       // New line
+            $GLOBALS['line_count']++;
             return "\n";
         }
-        if (ctype_space($c))
-            continue;
-        else
+        if (!ctype_space($c))
             return $c;
     }
+    return EOF;
 }
 
-// Read Escape sequence
-function getEscape() {
-    $number = "";
-    $number = fgets(STDIN, 4);
-    // 000-999
-    if (ctype_digit($number)) {
-        if (strcmp($number, "060") == 0)
-            return "&lt";
-        else if (strcmp($number, "062") == 0)
-            return "&gt";
-        else if (strcmp($number, "038") == 0)
-            return "&amp";
-        else 
-            return $number;
+/** Skip character to the end of line and increment counters
+*/
+function skipComment() {
+    $GLOBALS['comment_count']++;
+    $GLOBALS['line_count']++;
+    fgets(STDIN);
+}
+
+/** Check for new line or comment
+* $c - character to check
+* return value - true if new line or comment or space/tab detected
+*              - false if not
+*/
+function nlcCheck($c) {
+    if ((strcmp($c, "\n") == 0) {
+        $GLOBALS['line_count']++;
+        return true;
     }
-    else
-        terminate(SYN_ERR, "Escape sequence expected.");
+    if (strcmp($c, chr(35)) == 0) {
+        skipComment();
+        return true;
+    }
+    if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+        return true;
+    return false;
 }
 
-// Read string
-function getString($end) {
+/** Check proper escape sequence after \
+* return value - escape sequence number 
+*/
+function getEscape() {
+    $number = fgets(STDIN, 4);                  // Get 3 characters
+    if (!ctype_digit($number))                  // 000-999
+        terminate(SYN_ERR, "Escape sequence expected.");
+    return $number;
+}
+
+/** Read string constant
+* return value - string constant
+*/
+function getString() {
     global $line_count, $comment_count;
     $c;
     $str = "";
 
     while($c = fgetc(STDIN)) {
-        if (((strcmp($c, "\n") == 0) && $end)) {
-            $line_count++;
+        if (nlcCheck($c))                                       // End of string
             break;
-        }
-        if ((strcmp($c, " ") == 0) || (strcmp($c, "\t") == 0))
-            break;
-        if (strcmp($c, chr(92)) == 0) {
-            $tmp = getEscape();
-            $str.=chr(92);
-            $str.=$tmp;
+        if (strcmp($c, chr(92)) == 0) {                         // Escape sequence
+            $str = $STR.Tchr(92).getEscape();
             continue;
         }
-        // Comment
-        if (strcmp($c, chr(35)) == 0 && $end) {
-            fgets(STDIN);
-            $comment_count++;
-            $line_count++;
-            break;
-        }
-        if (ctype_print($c))
+        if (!ctype_space())
             $str.=$c;
         else
-            terminate(SYN_ERR, "Invalid string.");
+            terminate(SYN_ERR, "Invalid string.");              // Some invalid character
     }
-    return $str;
+    return (htmlspecialchars($str, ENT_XML1, 'UTF-8');          // Translate XML special characters
 }
 
-
-// Read int constant
-function getInt($end) {
+/** Read integer constant
+* return value - integer constant
+*/
+function getInt() {
     $c = fgetc(STDIN);
     $number;
 
-    if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)
+    if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)     // Optional + or -
         $number = $c;
     else
-        terminate(SYN_ERR, "Invalid int.");
+        terminate(SYN_ERR, "Invalid integer constant.");
 
-    while ($c = fgetc(STDIN)) {
+    while ($c = fgetc(STDIN)) {             // Check for digits
         if (is_numeric($c))
             $number.=$c;
         else
             break;
     }
 
-    if ((strcmp($c, "\n") == 0 && $end)) {
-        $line_count++;
-        return $number;
-    }
-    else if (strcmp($c, chr(35)) == 0 && $end) {
-        fgets(STDIN);
-        $comment_count++;
-        $line_count++;
-        return $number;
-    }
-    if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+    if (nlcCheck($c))                               // Valid number
         return $number;
 
-    terminate(SYN_ERR, "Invalid int.");
+    terminate(SYN_ERR, "Invalid integer.");                 
 }
 
-// Constant or variable
-function getSymb($end, &$type) {
-    global $line_count, $comment_count;
+/** Read symbol - constant or variable
+* $type - pointer to type of symbol - var, int, bool or string
+* return value - constant or variable name
+*/
+function getSymb(&$type) {
     $frame;
-    $type = getFrame($frame, false, $end);
+    $type = getFrame($frame, false);                // Check for frame or constant type
 
     switch ($type) {
-        case 1:
-            return $frame.getVarLab($end, false);
+        case 1:                                     // Variable name
+            $type = "var";
+            return $frame.getVarLab(false);
             break;
-        case 2:
-            return getInt($end);
+        case 2:                                     // Integer constant
+            $type = "int";
+            return getInt();
             break;
-        case 3:
-            return getString($end);
+        case 3:                                     // String constant
+            $type = "string";
+            return getString();
             break;
-        case 4:
+        case 4:                                     // Bool constant
+            $type = "bool";
             $tmp = "";
             $c;
             while ($c = fgetc(STDIN)) {
                 if (ctype_lower($c))
                     $tmp.=$c;
-                else if ((strcmp($c, "\n") == 0 && $end)) {
-                    $line_count++;
-                    break;
-                }
-                else if (strcmp($c, chr(35)) == 0 && $end) {
-                    fgets(STDIN);
-                    $comment_count++;
-                    $line_count++;
-                }
-                else if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
-                    break;
                 else
-                    terminate(SYN_ERR, "Invalid bool value.");
+                    break;
             }
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
             else
                 terminate(SYN_ERR, "Invalid bool value.");
+
+            if (!nlcCheck($c))                       // End of argument
+                terminate(SYN_ERR, "Invalid bool value.");                
             break;
         default:
             terminate(SYN_ERR, "Unknown error.");
@@ -233,34 +230,19 @@ function getSymb($end, &$type) {
     }
 }
 
-/* Get frame or type - int, string, bool
-* return int which symbolize
-* 1 - frame
-* 2 - int
-* 3 - string
-* 4 - bool
-* arg $str is used when returning 1
+/** Get frame(GF, LF, TF) or type(int, string, bool)
+* $frame - pointer to string where the name of frame is stored
+* $type - if true, '@' isn't expected after type name
+* return value - 1(frame), 2(int), 3(string), 4(bool)
 */
-function getFrame(&$frame, $is_type, $end) {
-    global $line_count, $comment_count;
+function getFrame(&$frame, $is_type) {
     $frame = skipWhite();
+    $frame = $frame.fgets(STDIN, 3);               // Get next 2 characters
 
-    if (strcmp($frame, "L") == 0 || strcmp($frame, "T") == 0 || strcmp($frame, "G") == 0) {
-
-        if (strcmp(fgetc(STDIN), "F") == 0)
-            $frame.="F";
-        else
-            terminate(SYN_ERR, "Invalid frame name.");
-
-        if (strcmp(fgetc(STDIN), "@") != 0)
-            terminate(SYN_ERR, "@ expected.");
-        else {
-            $frame.="@";
+    if (preg_match("/[G|L|T|]F@/", $frame))        // GF@ LF@ or TF@
             return 1;
-        }
-    }
     
-    if (ctype_lower($frame)) {
+    if (ctype_lower($frame)) {                     // Possible type name
         $c;
         while ($c = fgetc(STDIN)) {
             if (ctype_lower($c))
@@ -269,20 +251,11 @@ function getFrame(&$frame, $is_type, $end) {
                 break;
         }
 
-        if (strcmp($c, "@") != 0 && $is_type == false)
+        if (strcmp($c, "@") != 0 && $is_type == false)  // If is_type is false, @ is expected after type
             terminate(SYN_ERR, "@ expected.");
 
-        if ($is_type == true) {
-            if (strcmp($c, "\n") == 0 && $end)
-                $line_count++;
-            else if ((strcmp($c, "\t") == 0 || strcmp($c, " ") == 0))
-                ;
-            else if (strcmp($c, chr(35)) == 0 && $end) {
-                fgets(STDIN);
-                $comment_count++;
-                $line_count++;
-            }
-            else
+        if ($is_type == true) {                             
+            if (!nlcCheck($c))                          // End of argument
                 terminate(SYN_ERR, "Unknown type.");
         }   
 
@@ -292,67 +265,52 @@ function getFrame(&$frame, $is_type, $end) {
             return 3;
         if (strcmp($frame, "bool") == 0)
             return 4;
-    }
+
     terminate(SYN_ERR, "Unknown type of symbol.");
 }
 
-// Variable or label
-function getVarLab($end, $is_var) {
-    global $line_count, $comment_count;
+/** Check for valid variable or label name
+* is_var - if true, frame in front of variable name is expected
+* return value - string - name of variable/label
+*/
+function getVarLab($is_var) {
     $str = "";
 
-    if ($is_var == true) {
-        $is_frame = getFrame($str, false, $end);
-
+    if ($is_var == true) {                          // Check for frame
+        $is_frame = getFrame($str, false);
         if ($is_frame != 1)
             terminate(SYN_ERR, "Variable name expected.");
     }
  
-    // Must start with alpha or special
     $c = fgetc(STDIN);
-    if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)
+    if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)  // Name has to start with alpha or special character
+        if (strcmp($c, "&") == 0)                                   // Special XML character
+            $c = "&amp;";
         $str.=$c;
     else
         terminate(SYN_ERR, "Wrong variable name.");
 
     while ($c = fgetc(STDIN)) {
-        if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {
+        if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {    // Next characters could be alfanumeric or special
+            if (strcmp($c, "&") == 0)                                       // Special XML character
+                $c = "&amp;";
             $str.=$c;
             continue;
         }
-        if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+        if (nlcCheck($c))                          // End of argument
             break;
-        if (strcmp($c, "\n") == 0 && $end == true) {
-            $line_count++;
-            break;
-        }
-        if (strcmp($c, chr(35)) == 0 && $end) {
-                fgets(STDIN);
-                $comment_count++;
-                $line_count++;
-                break;
-        }
         else
             terminate(SYN_ERR, "Wrong variable name.");            
     }
     return $str;
 }
-
-
-function getTyp($end) {
-    $frame;
-    $type = getFrame($frame, true, $end); 
-    if ($type != 1)
-        return $frame;
-
-    terminate(SYN_ERR, "Type expected.");
-}
-
+/** Check for valid operation code
+* return value - string containing opcode
+*/
 function getInst() {
-    global $line_count, $comment_count; 
     $op_code = skipWhite();
 
-    while (strcmp($op_code, "\n") == 0)
+    while (strcmp($op_code, "\n") == 0 || strcmp($op_code, "#") == 0)   // Skip empty lines and comments
         $op_code = skipWhite();
 
     if ($op_code == EOF)
@@ -361,45 +319,37 @@ function getInst() {
     global $all_inst;
 
     $c;
-    $no_arg = false;
+    $no_arg = false;                                            // Signalize operation code without arguments
 
     while ($c = fgetc(STDIN)) {
         if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
             break;
         }
-        if (strcmp($c, "\n") == 0) {
-            $line_count++;
-            $no_arg = true;
-        }
-        if (strcmp($c, chr(35)) == 0) {
-            fgets(STDIN);
-            $comment_count++;
-            $line_count++;
-            $no_arg = true;
+        if (nlcCheck($c)) {                                     // Operation code must not have arguments
+            $no_arg = true
             break;
         }
         if (ctype_alnum($c))
             $op_code.=$c;
         else
-            terminate(SYN_ERR, "Unknown instruction");
+            terminate(SYN_ERR, "Unknown operation code.");
     }
-    // Case insentive
-    $op_code = strtolower($op_code);
+    $op_code = strtolower($op_code);                            // Case insentive
 
     foreach ($all_inst as $key => $value) {
         if (strcmp($key, $op_code) == 0) {
-            // \n or # after operation code
-            if ($no_arg == true) {
+            if ($no_arg == true) {                              // Ckeck if operation code have no arguments
                 if (count($all_inst[$key]) != 0)
-                    terminate(SYN_ERR, "Argument(s) expected.");
+                    terminate(SYN_ERR, "Argument(s) after operation code expected.");
             }
             return $op_code;
         }
     }
-    // Unknown operation code
-    terminate(SYN_ERR, "Unknown instruction");
+    terminate(SYN_ERR, "Unknown operation code.");
 }
 
+/** Write information to file
+*/
 function extension() {
     global $stats, $file, $params, $comment_count, $inst_count;
 
@@ -416,18 +366,18 @@ function extension() {
     }
 }
 
+/** Check for valid arguments, show help or set variables for extension
+*/
 function argHandle() {
     global $argc, $params, $stats, $file;
-    // No arguments
-    if ($argc == 1)
+    if ($argc == 1)                                         // No arguments
         return;
 
     $options = array("help", "stats:", "comments", "loc");
     $params = getopt("", $options);
 
-    if ($params == false) {
+    if ($params == false)
         terminate(ARG_ERR, "Wrong arguments, try --help.");
-    }
 
     if ($argc == 2) {
         if (isset($params["help"])) {
@@ -449,18 +399,14 @@ function argHandle() {
             terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 3) {
-        if (isset($params["help"]))
-            terminate(ARG_ERR, "Wrong arguments, try --help.");
-        if (isset($params["stats"])) {
+        if (isset($params["stats"]) && (isset($params["loc"]) || isset($params["comment"]))) {
             $stats = true;
             $file = $params["stats"];
         }
-        if (!isset($params["loc"]) && !isset($params["comment"]))
+        else
             terminate(ARG_ERR, "Wrong arguments, try --help.");
     }
     else if ($argc == 4) {
-        if (isset($params["help"]))
-            terminate(ARG_ERR, "Wrong arguments, try --help.");
         if (!isset($params["stats"]) || !isset($params["loc"]) || !isset($params["comment"]))
             terminate(ARG_ERR, "Wrong arguments, try --help.");
         $stats = true;
@@ -470,128 +416,74 @@ function argHandle() {
         terminate(ARG_ERR, "Wrong arguments, try --help.");
 }
 
-function main() {
-    // Arguments check
-    argHandle();
+/*******************************Main function**************************/
 
-    // First line check
-    $tmp = skipWhite();
-    $tmp = $tmp.rtrim(strtolower(fgets(STDIN)));
+argHandle();                                            // Check for arguments
 
-    if (strcmp($tmp, ".ippcode18") != 0)
+// First line check
+$tmp = rtrim(fgets(STDIN));
+
+    if (strcasecmp($tmp, ".ippcode18") != 0)            // Case insensitive 
         terminate(SYN_ERR, ".IPPcode18 is missing!");
+ 
+// Create basic XML
+$xml_el = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><program language="IPPcode18"></program>');
 
-    // Basic XML string
-$xml_str = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<program language="IPPcode18">
-</program>
-XML;
-    
-    $xml_el = new SimpleXMLElement($xml_str);
+$actual_line;                       // Number of actual line - signalize if \n was detected
 
-    global $inst_count, $all_inst, $line_count, $comment_count;
+while (true) {                      // Repeat until error or EOF
+    $op_code = getInst();
 
-    // $end signalize last parameter
-    $end;
+    if ($op_code == EOF)            // End of file
+        break;
 
-    $actual_line;
+    $inst_count++;
 
-    // Repeat until error or EOF
-    while (true) {
-        $op_code = getInst();
-        // End of file
-        if ($op_code == EOF)
-            break;
+    $xml_inst = $xml_el->addChild("instruction");
+    $xml_inst->addAttribute("order", $inst_count);
+    $xml_inst->addAttribute("opcode", strtoupper($op_code));
 
-        $inst_count++;
+    $actual_line = $line_count;     // Set actual line
 
-        $xml_inst = $xml_el->addChild("instruction");
-        $xml_inst->addAttribute("order", $inst_count);
-        $xml_inst->addAttribute("opcode", strtoupper($op_code));
+    foreach ($all_inst[$op_code] as $key => $value) {       // Get arguments
+        $xml_arg = $xml_inst->addChild("arg".strval($key + 1));
 
-        // For instrucions without arguments
-        if (count($all_inst[$op_code]) == 0)
-            continue;
-
-        $actual_line = $line_count;
-
-        foreach ($all_inst[$op_code] as $key => $value) {
-            if (count($all_inst[$op_code]) == ($key + 1)) 
-                $end = true;
-            else
-                $end = false;
-
-            $xml_arg = $xml_inst->addChild("arg".strval($key + 1));
-
-            switch ($value) {
-                case 1:
-                    $xml_arg->addAttribute("type", "var");
-                    $xml_arg[0] = getVarLab($end, true);
-                    break;
-                case 2:
-                    $xml_arg->addAttribute("type", "label");
-                    $xml_arg[0] = getVarLab($end, false);
-                    break;
-                case 3:
-                    $type;
-                    $str = getSymb($end, $type);
-
-                    switch ($type) {
-                        case 1:
-                            $xml_arg->addAttribute("type", "var");
-                            break;
-                        case 2:
-                            $xml_arg->addAttribute("type", "int");
-                            break;
-                        case 3:
-                            $xml_arg->addAttribute("type", "string");
-                            break;
-                        case 4:
-                            $xml_arg->addAttribute("type", "bool");
-                            break;
-                        default:
-                            // WTF
-                            break;
-                    }
-                    $xml_arg[0] = $str;
-                    break;
-                case 4:
-                    $xml_arg->addAttribute("type", "type");
-                    $xml_arg[0] = getTyp($end);
-                    break;
-                default:
-                    // WTF
-                    break;
-            }
+        switch ($value) {                                   // type of argument
+            case 1:                                         // Variable
+                $xml_arg->addAttribute("type", "var");
+                $xml_arg[0] = getVarLab(true);              // true - frame is expected
+                break;
+            case 2:                                         // Label
+                $xml_arg->addAttribute("type", "label");
+                $xml_arg[0] = getVarLab(false);             // false - frame isn't expected
+                break;
+            case 3:                                         // Symbol(variable or constant)
+                $type;
+                $str = getSymb($type);
+                $xml_arg->addAttribute("type", $str);
+                $xml_arg[0] = $str;
+                break;
+            case 4:                                         // Type
+                $xml_arg->addAttribute("type", "type");
+                $xml_arg[0] = getFrame($frame, true);
+                break;
+            default:
+                terminate(SYN_ERR, "Unknown error.");
+                break;
         }
-        // Check for valid format
-        if (($line_count - $actual_line) == 0) {
-            $c;
-            while ($c = fgetc(STDIN)) {
-                if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0)
-                    continue;
-                if (strcmp($c, chr(35)) == 0) {
-                    fgets(STDIN);
-                    $comment_count++;
-                    $line_count++;
-                    break;
-                }
-                if (strcmp($c, "\n") == 0) {
-                    $line_count++;
-                    break;
-                }
-                else
-                    terminate(SYN_ERR, "End of line expected.");
-            }
-        }
-        else if (($line_count - $actual_line) != 1)
-            terminate(SYN_ERR, "Instruction on multiple lines.");
+        if ((count($all_inst[$op_code]) > ($key + 1)) && ($line_count - $actual_line) != 0))
+            terminate(SYN_ERR, "Missing argument(s).");
     }
-    extension();
-    print $xml_el->asXml();
+
+    if (($line_count - $actual_line) == 0) {                // Check for new line after arguments
+        $c = skipWhite();
+        if (strcmp($c, "\n") && strcmp($c, "#"))            // Unexpected character after arguments
+            terminate(SYN_ERR, "Unexpected argument(s).");    
+    }
+    else if (($line_count - $actual_line) != 1)
+        terminate(SYN_ERR, "Instruction on multiple lines.");
 }
 
-main();
-
+extension();
+print $xml_el->asXml();
 ?>
