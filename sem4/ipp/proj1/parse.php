@@ -10,7 +10,7 @@
 /************************CONSTANTS**************************/
 const ARG_ERR = 10;
 const SYN_ERR = 21;
-const EOF = -1;
+const E_O_F = -1;
 const ERR = -2;
 
 /**********************GLOBAL VARIABLES*********************/
@@ -81,12 +81,11 @@ function terminate($code, $str) {
 }
 
 /** Skip all white characters
-* return value - first non-white character or EOF
+* return value - first non-white character or E_O_F
 */
 function skipWhite() {
-    print("skipWhite\n");
     $c;
-    while (!(($c = fgetc(STDIN)) === false)) {       // Repeat until EOF
+    while (!(($c = fgetc(STDIN)) === false)) {       // Repeat until E_O_F
         if (strcmp($c, chr(35)) == 0) {         // # - comment
             skipComment();
             return "#";
@@ -99,7 +98,7 @@ function skipWhite() {
             $c = fgetc(STDIN);
             if (strcmp($c, "\n") == 0) {
                 $GLOBALS['line_count']++;
-                return true;
+                return "\n";
             }
             else
                 terminate(SYN_ERR, "Unsupported line-ending!");
@@ -107,7 +106,7 @@ function skipWhite() {
         if (!ctype_space($c))
             return $c;
     }
-    return EOF;
+    return E_O_F;
 }
 
 /** Skip character to the end of line and increment counters
@@ -236,7 +235,7 @@ function getSymb(&$type) {
             }
             if (!nlcCheck($c))                       // End of argument
                 terminate(SYN_ERR, "Invalid bool value.");                
-                
+
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
             else
@@ -331,8 +330,8 @@ function getInst() {
     while (strcmp($op_code, "\n") == 0 || strcmp($op_code, "#") == 0)   // Skip empty lines and comments
         $op_code = skipWhite();
 
-    if ($op_code == EOF)
-        return EOF;
+    if ($op_code == E_O_F)
+        return E_O_F;
 
     global $all_inst;
 
@@ -450,12 +449,12 @@ $xml_el = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><program l
 
 $actual_line;                       // Number of actual line - signalize if \n was detected
 
-while (true) {                      // Repeat until error or EOF
+while (true) {                      // Repeat until error or E_O_F
     $op_code = getInst();
     $actual_line = $line_count;     // Set actual line
-    if ($op_code == EOF)            // End of file
+    if ($op_code == E_O_F)            // End of file
         break;
-    print ("Instr: ".$op_code."\n Actual line: ".$actual_line."\n");
+    //print ("Instr: ".$op_code."\n Actual line: ".$actual_line."\n");
     $inst_count++;
 
     $xml_inst = $xml_el->addChild("instruction");
@@ -500,7 +499,7 @@ while (true) {                      // Repeat until error or EOF
 
     if (($line_count - $actual_line) == 0) {                    // Check for new line after arguments
         $c = skipWhite();
-        if (strcmp($c, "\n") && strcmp($c, "#") && $c != EOF)   // Unexpected character after arguments
+        if (strcmp($c, "\n") && strcmp($c, "#") && $c != E_O_F)   // Unexpected character after arguments
             terminate(SYN_ERR, "Unexpected argument(s).");    
     }
     else if (($line_count - $actual_line) != 1)
