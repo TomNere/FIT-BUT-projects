@@ -59,7 +59,7 @@ $all_inst = array(
     "eq" => array(1, 3, 3), 
     "and" => array(1, 3, 3), 
     "or" => array(1, 3, 3), 
-    "not" => array(1, 3, 3), 
+    "not" => array(1, 3), 
     "stri2int" => array(1, 3, 3), 
     "concat" => array(1, 3, 3), 
     "getchar" => array(1, 3, 3), 
@@ -84,8 +84,9 @@ function terminate($code, $str) {
 * return value - first non-white character or EOF
 */
 function skipWhite() {
+    print("skipWhite\n");
     $c;
-    while ($c = fgetc(STDIN)) {                 // Repeat until EOF
+    while (!(($c = fgetc(STDIN)) === false)) {       // Repeat until EOF
         if (strcmp($c, chr(35)) == 0) {         // # - comment
             skipComment();
             return "#";
@@ -93,6 +94,15 @@ function skipWhite() {
         else if (strcmp($c, "\n") == 0) {       // New line
             $GLOBALS['line_count']++;
             return "\n";
+        }
+        if (strcmp($c, "\r") == 0) {
+            $c = fgetc(STDIN);
+            if (strcmp($c, "\n") == 0) {
+                $GLOBALS['line_count']++;
+                return true;
+            }
+            else
+                terminate(SYN_ERR, "Unsupported line-ending!");
         }
         if (!ctype_space($c))
             return $c;
@@ -150,11 +160,10 @@ function getEscape() {
 * return value - string constant
 */
 function getString() {
-    global $line_count, $comment_count;
     $c;
     $str = "";
 
-    while($c = fgetc(STDIN)) {
+    while(!(($c = fgetc(STDIN)) === false)) {
         if (nlcCheck($c))                                       // End of string
             break;
         if (strcmp($c, chr(92)) == 0) {                         // Escape sequence
@@ -166,7 +175,7 @@ function getString() {
         else
             terminate(SYN_ERR, "Invalid string.");              // Some invalid character
     }
-    return (htmlspecialchars($str, ENT_XML1, 'UTF-8'));          // Translate XML special characters
+    return $str;
 }
 
 /** Read integer constant
@@ -181,7 +190,7 @@ function getInt() {
     else
         terminate(SYN_ERR, "Invalid integer constant.");
 
-    while ($c = fgetc(STDIN)) {             // Check for digits
+    while (!(($c = fgetc(STDIN)) === false)) {             // Check for digits
         if (is_numeric($c))
             $number.=$c;
         else
@@ -219,19 +228,20 @@ function getSymb(&$type) {
             $type = "bool";
             $tmp = "";
             $c;
-            while ($c = fgetc(STDIN)) {
+            while (!(($c = fgetc(STDIN)) === false)) {
                 if (ctype_lower($c))
                     $tmp.=$c;
                 else
                     break;
             }
+            if (!nlcCheck($c))                       // End of argument
+                terminate(SYN_ERR, "Invalid bool value.");                
+                
             if (strcmp($tmp, "true") == 0 || strcmp($tmp, "false") == 0)
                 return $tmp;
             else
                 terminate(SYN_ERR, "Invalid bool value.");
 
-            if (!nlcCheck($c))                       // End of argument
-                terminate(SYN_ERR, "Invalid bool value.");                
             break;
         default:
             terminate(SYN_ERR, "Unknown error.");
@@ -253,7 +263,7 @@ function getFrame(&$frame, $is_type) {
     
     if (ctype_lower($frame)) {                     // Possible type name
         $c;
-        while ($c = fgetc(STDIN)) {
+        while (!(($c = fgetc(STDIN)) === false)) {
             if (ctype_lower($c))
                 $frame.=$c;
             else
@@ -289,30 +299,27 @@ function getVarLab($is_var) {
         $is_frame = getFrame($str, false);
         if ($is_frame != 1)
             terminate(SYN_ERR, "Variable name expected.");
+        $c = fgetc(STDIN);
     }
+    else
+        $c = skipWhite();
  
-    $c = fgetc(STDIN);
     if (ctype_alpha($c) || preg_match("/[-|_|&|$|%|*]/", $c) == 1)  // Name has to start with alpha or special character
         $str.=$c;
-    else {
-        print ('aaa'.$str);
+    else
         terminate(SYN_ERR, "Wrong variable name.");
-    }
 
-    while ($c = fgetc(STDIN)) {
+    while (($c = fgetc(STDIN)) !== false) {
         if (ctype_alnum($c) || preg_match("/[-|_|&|$|%|*]/", $c) == 1) {    // Next characters could be alfanumeric or special
             $str.=$c;
             continue;
         }
         if (nlcCheck($c))               // End of argument
             break;
-        else {
-            print(ord($c)."\n");
-            var_dump($str);
-            terminate(SYN_ERR, "Wrong variable name.");            
-        }
+        else
+            terminate(SYN_ERR, "Wrong variable name.");
     }
-    return (htmlspecialchars($str, ENT_XML1, 'UTF-8'));          // Translate XML special character &
+    return $str;
 }
 
 /** Check for valid operation code
@@ -332,7 +339,7 @@ function getInst() {
     $c;
     $no_arg = false;                                            // Signalize operation code without arguments
 
-    while ($c = fgetc(STDIN)) {
+    while (!(($c = fgetc(STDIN)) === false)) {
         if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
             break;
         }
@@ -436,7 +443,8 @@ $tmp = rtrim(fgets(STDIN));
 
     if (strcasecmp($tmp, ".ippcode18") != 0)            // Case insensitive 
         terminate(SYN_ERR, ".IPPcode18 is missing!");
- 
+$line_count++; 
+
 // Create basic XML
 $xml_el = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><program language="IPPcode18"></program>');
 
@@ -447,7 +455,7 @@ while (true) {                      // Repeat until error or EOF
     $actual_line = $line_count;     // Set actual line
     if ($op_code == EOF)            // End of file
         break;
-
+    print ("Instr: ".$op_code."\n Actual line: ".$actual_line."\n");
     $inst_count++;
 
     $xml_inst = $xml_el->addChild("instruction");
@@ -476,8 +484,11 @@ while (true) {                      // Repeat until error or EOF
                 $xml_arg[0] = $str;
                 break;
             case 4:                                         // Type
+                $type;
+                if (getFrame($type, true) == 1)
+                    terminate(SYN_ERR, "Invalid type.");
                 $xml_arg->addAttribute("type", "type");
-                $xml_arg[0] = getFrame($frame, true);
+                $xml_arg[0] = $type;
                 break;
             default:
                 terminate(SYN_ERR, "Unknown error.");
