@@ -118,6 +118,15 @@ function nlcCheck($c) {
         $GLOBALS['line_count']++;
         return true;
     }
+    if (strcmp($c, "\r") == 0) {
+        $c = fgetc(STDIN);
+        if (strcmp($c, "\n") == 0) {
+            $GLOBALS['line_count']++;
+            return true;
+        }
+        else
+            terminate(SYN_ERR, "Unsupported line-ending!");
+    }
     if (strcmp($c, chr(35)) == 0) {
         skipComment();
         return true;
@@ -283,20 +292,25 @@ function getVarLab($is_var) {
     }
  
     $c = fgetc(STDIN);
-    if (ctype_alpha($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1)  // Name has to start with alpha or special character
+    if (ctype_alpha($c) || preg_match("/[-|_|&|$|%|*]/", $c) == 1)  // Name has to start with alpha or special character
         $str.=$c;
-    else
+    else {
+        print ('aaa'.$str);
         terminate(SYN_ERR, "Wrong variable name.");
+    }
 
     while ($c = fgetc(STDIN)) {
-        if (ctype_alnum($c) || preg_match("/[_|-|&|$|%|*]/", $c) == 1) {    // Next characters could be alfanumeric or special
+        if (ctype_alnum($c) || preg_match("/[-|_|&|$|%|*]/", $c) == 1) {    // Next characters could be alfanumeric or special
             $str.=$c;
             continue;
         }
-        if (nlcCheck($c))                          // End of argument
+        if (nlcCheck($c))               // End of argument
             break;
-        else
+        else {
+            print(ord($c)."\n");
+            var_dump($str);
             terminate(SYN_ERR, "Wrong variable name.");            
+        }
     }
     return (htmlspecialchars($str, ENT_XML1, 'UTF-8'));          // Translate XML special character &
 }
@@ -430,7 +444,7 @@ $actual_line;                       // Number of actual line - signalize if \n w
 
 while (true) {                      // Repeat until error or EOF
     $op_code = getInst();
-
+    $actual_line = $line_count;     // Set actual line
     if ($op_code == EOF)            // End of file
         break;
 
@@ -440,7 +454,8 @@ while (true) {                      // Repeat until error or EOF
     $xml_inst->addAttribute("order", $inst_count);
     $xml_inst->addAttribute("opcode", strtoupper($op_code));
 
-    $actual_line = $line_count;     // Set actual line
+    if(count($all_inst[$op_code]) == 0)
+        continue;
 
     foreach ($all_inst[$op_code] as $key => $value) {       // Get arguments
         $xml_arg = $xml_inst->addChild("arg".strval($key + 1));
@@ -457,7 +472,7 @@ while (true) {                      // Repeat until error or EOF
             case 3:                                         // Symbol(variable or constant)
                 $type;
                 $str = getSymb($type);
-                $xml_arg->addAttribute("type", $str);
+                $xml_arg->addAttribute("type", $type);
                 $xml_arg[0] = $str;
                 break;
             case 4:                                         // Type
