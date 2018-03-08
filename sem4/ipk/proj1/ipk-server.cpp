@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <netdb.h>
 #include "ipk.h"
 
@@ -16,31 +17,58 @@ using namespace std;
 string parseReq(string req_message) {
     ifstream file;
     file.open("/etc/passwd");
-    string line;
+    string line, lines;
 
     switch(req_message[0]) {
         case '1':
             while(getline(file, line)) {
-                if (line.find(req_message.substr(2)) != string::npos) {
+                if (line.substr(0, line.find(":")).compare(req_message.substr(2)) == 0) {
                     int index;
                     for(int i = 1; i <= 4; i++) {
                         if(line.find(":") == string::npos) {
                             break;
                         }
-                        line.erase(line.find(":"));
+                        line.erase(0, line.find(":") + 1);
                     }
                     file.close();
-                    return (line.substr(0, line.find(":")) + "\0");
+                    return (line.substr(0, line.find(":")));
                 }
             }
             break;
         case '2':
+            while(getline(file, line)) {
+                if (line.substr(0, line.find(":")).compare(req_message.substr(2)) == 0) {
+                    int index;
+                    for(int i = 1; i <= 5; i++) {
+                        if(line.find(":") == string::npos) {
+                            break;
+                        }
+                        line.erase(0, line.find(":") + 1);
+                    }
+                    file.close();
+                    return (line.substr(0, line.find(":")));
+                }
+            }
             break;
         case '3':
+            lines = "";
+            while(getline(file, line)) {
+                if ((req_message.substr(2)).compare("-") == 0) {
+                    lines = lines + line.substr(0, line.find(":")) + "\n";   
+                }
+                else if (line.substr(0, req_message.substr(2).length()).compare(req_message.substr(2)) == 0) {
+                    lines = lines + line.substr(0, line.find(":")) + "\n";
+                }
+            }
+            if (lines.length() > 0) {
+                lines.resize(lines.size() - 1);    
+            }
+            return lines;
             break;
         default:
             ERR_RET("Invalid request from client!");
     }
+    return "";
 }
 
 void listen(string port) {
@@ -63,7 +91,7 @@ void listen(string port) {
 
     int rc;
     if ((rc = bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
-        cout << strerror(errno) << endl;
+        cerr << strerror(errno) << endl;
         ERR_RET("Binding error!");
     }
 
@@ -91,11 +119,16 @@ void listen(string port) {
             string data_to_send = parseReq(received_request);
             size_t size_to_send = data_to_send.length();
             string tmp = "";
+
+            if (size_to_send == 0) {
+                send(comm_socket, "\0", 1, 0);
+            }
+
             while(size_to_send) {
                 // Notice \0 character at the end of C-style string
                 if (size_to_send > 1024) {
                     tmp = data_to_send.substr(0, 1023);
-                    data_to_send.erase(1023);
+                    data_to_send.erase(0, 1023);
                     size_to_send = size_to_send - 1023;
                 }
                 else {

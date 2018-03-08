@@ -1,13 +1,14 @@
 #include <iostream>
-#include <string>
+#include <string.h>
 #include <unistd.h>
 #include <regex>
 #include <ctype.h>
-#include <cerrno>
+#include <errno.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include "ipk.h"
 
 using namespace std;
@@ -48,9 +49,9 @@ class InputInfo {
         // Host check
         if (isdigit(host[0])) {
             // Just for IP check
-            unsigned char buffer[sizeof(struct in6_addr)];
+            in_addr tmp_ip;
 
-            if (inet_pton(AF_INET, host.c_str(), buffer) != 1) {
+            if (inet_pton(AF_INET, host.c_str(), &tmp_ip) != 1) {
                 ERR_RET("Invalid IP address!");
             }
             host_type = 1;
@@ -108,7 +109,7 @@ void request(InputInfo info) {
         ERR_RET("Connection error!");
     }
     // Send request
-    int bytestx = send(client_socket, info.req_message.c_str(), info.req_message.length(), 0);
+    int bytestx = send(client_socket, info.req_message.c_str(), info.req_message.length() + 1, 0);
     if (bytestx < 0) {
         ERR_RET("Send error!");   
     }
@@ -118,7 +119,7 @@ void request(InputInfo info) {
     string received_msg = "";
 
     // Receive data
-    while((bytesrx = recv(client_socket, buff, 1024, 0)) > 0) {
+    while ((bytesrx = recv(client_socket, buff, 1024, 0)) > 0) {
         received_msg.append(string(buff));
         if (bytesrx < 1024) {
             break;
@@ -138,42 +139,49 @@ int main(int argc, char const *argv[])
     info.initialize();
 
     int option;
+    opterr = 0;
 
-    while((option = getopt(argc, (char**) argv, "h:p:n:f:l::")) != -1) {
+    while((option = getopt(argc, (char**) argv, ":h:p:n:f:l:")) != -1) {
         switch(option) {
             case 'h':
                 if (info.emptyComp(info.host)) {
                     ERR_RET("Invalid parameters!");
                 }
-                info.host = optarg;
+                info.host = string(optarg);
                 break;
             case 'p':
                 if (info.emptyComp(info.port)) {
                     ERR_RET("Invalid parameters!");
                 }
-                info.port = optarg;
+                info.port = string(optarg);
                 break;
             case 'n':
                 if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 1;
-                info.login = optarg;
+                info.login = string(optarg);
                 break;
             case 'f':
                 if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 2;
-                info.login = optarg;
+                info.login = string(optarg);
                 break;
             case 'l':
                 if (info.req_type != 0) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.req_type = 3;
-                if (optarg != NULL) {
-                    info.login = optarg;    
+                info.login = string(optarg);
+                break;
+            case ':':
+                if (optopt == 'l') {
+                    info.req_type = 3;
+                }
+                else {
+                    ERR_RET("Invalid parameters!");
                 }
                 break;
             default:
