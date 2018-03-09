@@ -1,0 +1,33 @@
+\documentclass[a4paper, 11pt, twocolumn]{article}
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[IL2]{fontenc}
+\usepackage{times}
+\usepackage[left=1.5cm,text={18cm, 25cm},top=2.5cm]{geometry}
+\newcommand{\myuv}[1]{\quotedblbase #1\textquotedblleft}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+	
+	\textsc{\Huge Fakulta informačních technologií\\[3.5mm]
+			Vysoké učení technické v~Brně}
+	\\[79mm]
+	{\LARGE Typografie a publikování\,--\,2. projekt\\[1.5mm]
+	Sazba dokumentů a matematických výrazů}
+	\vfill
+\end{center}
+{\Large 2018 \hfill Tomáš Nereča(xnerec00)}
+\\[-4mm]
+\end{titlepage}
+
+\section*{Úvod}
+V~této úloze si vyzkoušíme sazbu titulní strany, matematických vzorců, prostředí a dalších textových struktur obvyklých pro technicky zaměřené texty (například rovnice (1) nebo definice 1 na straně 1). Rovněž si vyzkoušíme používání odkazů \verb|\ref| a \verb|\pageref|.
+
+Na titulní straně je využito sázení nadpisu podle optického středu s~využitím zlatého řezu. Tento postup byl probírán na přednášce. Dále je použito odřádkování se
+zadanou relativní velikostí 0.4em a 0.3em.
+
+\section{Matematický text}
+Nejprve se podíváme na sázení matematických symbolů a výrazů v plynulém textu včetně sazby definic a vět s využitím balíku \verb|amsthm|. Rovněž použijeme poznámku pod čarou s použitím příkazu \verb|\footnote| . Někdy je vhodné použít konstrukci \verb|${}$|, která říká, že matematický text nemá být zalomen.
+
+\end{document}
