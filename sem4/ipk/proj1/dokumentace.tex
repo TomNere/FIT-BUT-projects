@@ -1,0 +1,54 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[IL2]{fontenc}
+\usepackage{times}
+\usepackage[left=1.5cm,text={18cm, 25cm},top=2.5cm]{geometry}
+\newcommand{\myuv}[1]{\quotedblbase #1\textquotedblleft}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+	
+	\textsc{\Huge Fakulta informačních technologií\\[3.5mm]
+			Vysoké učení technické v~Brně}
+	\\[79mm]
+	{\LARGE IPK \,--\, Počítačové komunikace a sítě\\[1.5mm]
+	Projekt č.1 - Zjištění informací o uživateli}
+	\vfill
+\end{center}
+{\Large 12.3.2018 \hfill Tomáš Nereča(xnerec00)}
+\\[-4mm]
+\end{titlepage}
+
+\section{Zadanie}
+Zoznámiť sa s kostrami kódov pre programovanie sieťových aplikácií (klient, server) za použitia \emph{BSD socketov}. Navrhnúť vlastný aplikačný protokol realizujúci prenos informácií o použivateľoch a naprogramovať klientskú a serverovú aplikáciu.
+
+\section{Základné informácie}
+Komunikáciu medzi serverom a klientom zabezpečuje protokol \emph{TCP}, nakoľko bolo potrebné zabezpečiť bezpečný prenos informácií bez poškodenia dát. Na základe zadaných vstupných argumentov pri spúšťaní klienta sa vytvorí správa - \emph{request}, ktorá je odoslaná na server. Server následne v súbore \textbf{etc/passwd} vyhľadá požadované údaje a odošle správu obsahujúcu tieto údaje klientovi, prípadne prázdnu správu v prípade, že sa údaje nepodarilo nájsť.
+
+\section{Popis riešenia}
+Kontrolu vstupných argumentov v oboch aplikáciách zabezpečuje funkcia \textsc{getopt()}. V prípade nesprávnej kombinácie, prípadne chýbajúcich argumentov aplikácia vypíše nápovedu a skončí.
+
+\subsection{Klient}
+Po úspešnej kontrole argumentov sa vytvorí request, ktorý obsahuje hlavičku v tvare \verb|<--xnerec00_protocol-->|, ďaľej číselný kód zvoleného argumentu a prípadne \textbf{login}. Jednotlivé časti sú oddelené znakom \textbf{\&}.
+
+Následne sa klient pokúsi nadviazať TCP komunikáciu so serverom a odoslať vytvorený request. K tomu je potrebné vykonať nasledujúce kroky:
+\begin{itemize}
+\item vytvoriť \emph{socket} pomocou funkcie \textsc{socket()}
+\item vyhladať \emph{DNS} serveru a preložiť, prípadne skontrolovať prítomnosť na zadanej \emph{IPv4} adrese pomocou funkcie \textsc{gethostbyname()}
+\item pripojiť sa na server pomocou funkcie \textsc{connect()}
+\item odoslať request pomocou funkcie \textsc{send()}
+\end{itemize}
+
+Po úspešnom vykonaní týchto krokov je klient pripravený príjimať dáta zo serveru. Dáta su ukladané do \emph{bufferu}. Prijatá správa je ihneď vytlačená na štandartný výstup. Prijímanie dát zabezpečuje funkcia \emph{recv()} vo \emph{while} cykle. Ak prijaté dáta nenaplnia buffer, signalizuje to, že server už odoslal všetky dáta. Po vyskočení z cyklu sa uzavrie socket pomocou funkcie \emph{close()} a aplikácia sa ukončí.
+
+\subsection{Server}
+Ako základ pri implementácii aplikačného protokolu som sa držal 
+Pri riešení projektu som sa snažil čo najviac držať materiálov k predmetu. Využil som úryvky kódu 
+\section{Zaujímavosti}
+\section{Príklady použitia}
+\section{Zdroje}
+
+\end{document}
+
