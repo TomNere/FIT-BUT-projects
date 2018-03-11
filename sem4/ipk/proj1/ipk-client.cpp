@@ -1,18 +1,19 @@
-#include <iostream>
-#include <string.h>
-#include <unistd.h>
-#include <regex>
-#include <ctype.h>
-#include <errno.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include "ipk.h"
+#include <iostream>     // I/O operations
+#include <unistd.h>     // getopt etc.   
+#include <string.h>     // bzero, bcopy
+#include <arpa/inet.h>  // inet_pton
+#include <sys/socket.h> // Sockets
+#include <netdb.h>      // gethostbyname...
+#include <netinet/in.h> // sockaddr_in...
 
 using namespace std;
 
+// Error messages...
+const string client_help = "Invalid parameters!\n Usage: ./ipk-client -h host -p port [-n|-f|-l] login\n"
+                           "       ./ipk-client -h host -p port -l\n";
+#define ERR_RET(message) cerr << message << endl; exit(EXIT_FAILURE);
+
+// Class representing all information about request
 class InputInfo {
     public: 
     string host, port, login, req_message;
@@ -23,45 +24,29 @@ class InputInfo {
     * l - 3
     */
     int req_type;
-    int host_type;
 
-    bool h_flag, p_flag;
-
-    void initialize() {
+    // Constructor
+    InputInfo() {
         host = req_message = port = login = "";
         req_type = 0;
-        h_flag = p_flag = false;
     }
 
-    bool emptyComp(string str) {
-        if (str.compare("")) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-
+    // Validate arguments
     void validate() {
-        if (!host.compare("") || !port.compare("")) {
+        if (!host.compare("") || !port.compare("")) {           // Check for host and port
             ERR_RET("Missing parameters!");
         }
-        // Host check
-        if (isdigit(host[0])) {
-            // Just for IP check
+
+        if (isdigit(host[0])) {         // If digit, check for valid IPv4 server_address
+            // Just for IPv4 check
             in_addr tmp_ip;
 
             if (inet_pton(AF_INET, host.c_str(), &tmp_ip) != 1) {
-                ERR_RET("Invalid IP address!");
+                ERR_RET("Invalid IP server_address!");
             }
-            host_type = 1;
         }
-        else {
-            host_type = 2;
-        }
-
-        // Port check
-        if (port.find_first_not_of("0123456789") == string::npos) {
+       
+        if (port.find_first_not_of("0123456789") == string::npos) {      // Check for valid port
             if (stoi(port, NULL, 10) > 65535) {
                 ERR_RET("Invalid port!");
             }
@@ -69,88 +54,107 @@ class InputInfo {
         else {
             ERR_RET("Invalid port!");
         }
-        if (req_type == 0) {
+
+        if (req_type == 0) {                // Missing [n|f|l]
             ERR_RET("Missing parameters!");
         }
 
-        // login is needed
-        if (req_type != 3) {
+        if (req_type != 3) {                // Login is required for -n and -f
             if(!login.compare("")) {
                 ERR_RET("Missing parameters!");       
             }
         }
-        if (!login.compare("")) {
-            login = "-";
+
+        if (login.length() > (1022 - 1)) {  // Too long login to send in 1 buffer
+            ERR_RET("Unsupported length of login!"); 
         }
-        req_message = to_string(req_type) + "&" + login; 
+
+        req_message = to_string(req_type) + "&" + login;    // Message sent to server
     }
 };
 
-// send request to the server
+// Send request and print message from server
 void request(InputInfo info) {
-    int client_socket;
-    struct sockaddr_in address;
-    struct hostent* server;
-
-    if ((server = gethostbyname(info.host.c_str())) == NULL) {
-        ERR_RET("Host not found!");
-    }
-    bzero((char *) &address, sizeof(address));
-    address.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, (char *)&address.sin_addr.s_addr, server->h_length);
-    address.sin_port = htons(stoul(info.port, NULL, 10));
-
     // Create socket
+    int client_socket;
     if((client_socket = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
         ERR_RET("Socket error!")
     }
+    // Set timeout
+    // (https://stackoverflow.com/questions/30395258/setting-timeout-to-recv-function)
+    struct timeval tv;
+    tv.tv_sec = 15;        // 15 Secs Timeout
+    tv.tv_usec = 0;        // Not init'ing this can cause strange errors
+    setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+    // Get network host entry
+    struct hostent* server;
+    if ((server = gethostbyname(info.host.c_str())) == NULL) {
+        ERR_RET("Host not found!");
+    }
+    
+    // Create necessary structures
+    struct sockaddr_in server_address;
+    bzero((char *) &server_address, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&server_address.sin_addr.s_addr, server->h_length);
+    server_address.sin_port = htons(stoul(info.port, NULL, 10));        // Port is string, need conversion
+
     // Connect
-    if ((connect(client_socket, (const struct sockaddr *)&address, sizeof(address))) != 0) {
+    if ((connect(client_socket, (const struct sockaddr *)&server_address, sizeof(server_address))) != 0) {
         ERR_RET("Connection error!");
     }
-    // Send request
-    int bytestx = send(client_socket, info.req_message.c_str(), info.req_message.length() + 1, 0);
+
+    // Send 1 request message
+    int bytestx = send(client_socket, info.req_message.c_str(), info.req_message.length() + 1, 0);      // + 1 for '\0' character 
     if (bytestx < 0) {
-        ERR_RET("Send error!");   
+        ERR_RET("Sending error!");
     }
 
+    // Variables for data receiving
+    // Notice \0 character at the end of C-style string
+    const int BUFSIZE = 1024;
     int bytesrx;
-    char buff[1024];
+    char buff[BUFSIZE];
     string received_msg = "";
-
-    // Receive data
-    while ((bytesrx = recv(client_socket, buff, 1024, 0)) > 0) {
-        received_msg.append(string(buff));
-        if (bytesrx < 1024) {
+    // Receive data in loop
+    while ((bytesrx = recv(client_socket, buff, BUFSIZE, 0)) > 0) {
+        cout << buff;
+        // Send OK message
+        int bytestx = send(client_socket, "OK", 3, 0);      // + 1 for '\0' character 
+        if (bytestx < 0) {
+            ERR_RET("Sending error!");
+        }
+        if (bytesrx < BUFSIZE) {
             break;
         }
     }
     if (bytesrx < 0) {
-        ERR_RET("Receive error!");
+        ERR_RET("Receiving error!");
     }
-    cout << received_msg << endl;
-    close(client_socket);
-    
+    close(client_socket);           // Close socket
 }
 
+/* Main function 
+* check parameters and call functions validate() and request()
+*/
 int main(int argc, char const *argv[])
 {
+    // Create object
     InputInfo info;
-    info.initialize();
 
     int option;
-    opterr = 0;
+    opterr = 0;         // Don't print error message if error occur
 
     while((option = getopt(argc, (char**) argv, ":h:p:n:f:l:")) != -1) {
         switch(option) {
             case 'h':
-                if (info.emptyComp(info.host)) {
+                if (info.host.compare("")) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.host = string(optarg);
                 break;
             case 'p':
-                if (info.emptyComp(info.port)) {
+                if (info.port.compare("")) {
                     ERR_RET("Invalid parameters!");
                 }
                 info.port = string(optarg);
