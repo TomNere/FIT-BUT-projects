@@ -3,8 +3,14 @@
 \usepackage[utf8]{inputenc}
 \usepackage[IL2]{fontenc}
 \usepackage{times}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amsfonts}
 \usepackage[left=1.5cm,text={18cm, 25cm},top=2.5cm]{geometry}
 \newcommand{\myuv}[1]{\quotedblbase #1\textquotedblleft}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definice}
 
 \begin{document}
 \begin{titlepage}
@@ -29,5 +35,28 @@ zadanou relativní velikostí 0.4em a 0.3em.
 
 \section{Matematický text}
 Nejprve se podíváme na sázení matematických symbolů a výrazů v plynulém textu včetně sazby definic a vět s využitím balíku \verb|amsthm|. Rovněž použijeme poznámku pod čarou s použitím příkazu \verb|\footnote| . Někdy je vhodné použít konstrukci \verb|${}$|, která říká, že matematický text nemá být zalomen.
+
+\begin{definition}
+\label{definice_1}
+Turingův stroj \emph{(TS) je definován jako šestice tvaru $M=(Q,\Sigma,\Gamma,\delta, q_0, q_F)$, kde:}
+
+\begin{itemize}
+\item \emph{Q je konečná množina} vnitřních (řídicích) stavů,
+\item \emph{$\Sigma$ je konečná množina symbolů nazývaná} vstupní abeceda, $\Delta \not\in \Sigma$,
+\item \emph{ $\Gamma$ je konečná množina symbolů, $\Sigma \subset \Gamma, \Delta\in \Gamma$, nazývaná} pásková abeceda,
+\item $\delta\!:\!( \,Q\setminus\{q_F\})\,\!\times\Gamma \longrightarrow Q\times( \,\Gamma\cup\{L,R\}) \,$,\emph{kde} $ L,R \not\in\Gamma,$ \emph{je parciální} přechodová funkce,
+\item $q_0$ \emph{je} počáteční stav, $q_0\in Qa$
+\item $q_F$ \emph{je} koncový stav, $q_F\in Qa$.
+\end{itemize}
+
+Symbol $\delta$ značí tzv. \emph{blank} (prázdný symbol), který se vyskytuje na místech pásky, která nebyla ještě použita (může ale být na pásku zapsán i později).
+
+\emph{Konfigurace pásky} se skládá z nekonečného řetězce,
+který reprezentuje obsah pásky a pozice hlavy na tomto řetězci. Jedná se o prvek množiny $\{\gamma \Delta^\omega\mid\gamma\in\Gamma^*\}\times \mathbb{N}$
+\footnote{Pro libovolnou abecedu $\Sigma$ je $\Sigma^\omega$ množina všech nekonečných řetězců nad $\Sigma$, tj. nekonečných posloupností symbolů ze $\Sigma$. Pro připomenutí: $\Sigma^*$ je množina všech \emph{konečných} řetězců nad $\Sigma$.}.
+\emph{Konfiguraci pásky} obvykle zapisujeme jako $\Delta xyz\underline{x}x\Delta\,\dots$ (podtržení značí pozici hlavy). \emph{Konfigurace stroje} je pak dána stavem řízení a konfigurací pásky. Formálně se jedná o prvek množiny $Q\times\{\gamma\Delta^\omega\mid\gamma\in\Gamma^*\}\times\mathbb{N}$.
+
+
+\end{definition}
 
 \end{document}
