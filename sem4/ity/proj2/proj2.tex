@@ -11,6 +11,8 @@
 
 \theoremstyle{definition}
 \newtheorem{definition}{Definice}
+\theoremstyle{definition}
+\newtheorem{sentence}{Věta}
 
 \begin{document}
 \begin{titlepage}
@@ -48,6 +50,7 @@ Turingův stroj \emph{(TS) je definován jako šestice tvaru $M=(Q,\Sigma,\Gamma
 \item $q_0$ \emph{je} počáteční stav, $q_0\in Qa$
 \item $q_F$ \emph{je} koncový stav, $q_F\in Qa$.
 \end{itemize}
+\end{definition}
 
 Symbol $\delta$ značí tzv. \emph{blank} (prázdný symbol), který se vyskytuje na místech pásky, která nebyla ještě použita (může ale být na pásku zapsán i později).
 
@@ -56,7 +59,48 @@ který reprezentuje obsah pásky a pozice hlavy na tomto řetězci. Jedná se o 
 \footnote{Pro libovolnou abecedu $\Sigma$ je $\Sigma^\omega$ množina všech nekonečných řetězců nad $\Sigma$, tj. nekonečných posloupností symbolů ze $\Sigma$. Pro připomenutí: $\Sigma^*$ je množina všech \emph{konečných} řetězců nad $\Sigma$.}.
 \emph{Konfiguraci pásky} obvykle zapisujeme jako $\Delta xyz\underline{x}x\Delta\,\dots$ (podtržení značí pozici hlavy). \emph{Konfigurace stroje} je pak dána stavem řízení a konfigurací pásky. Formálně se jedná o prvek množiny $Q\times\{\gamma\Delta^\omega\mid\gamma\in\Gamma^*\}\times\mathbb{N}$.
 
+\subsection{Podsekce obsahující větu a odkaz}
+\begin{definition}
+\label{definice_2}
+Řetězec $w$ nad abecedou $\Sigma$ je přijat TS \emph{M jestliže M při aktivaci z počáteční konfigurace pásky} $\underline{\Delta}w\Delta$\,\dots a počátečního stavu $q_0$ zastaví přechodem do koncového stavu $q_F$, tj. $( \,q_0,\Delta w\Delta^\omega,0) \, \overset{*}{\underset{M}{\vdash}} ( \,q_F,\gamma,n) \,$ \emph{pro nějaké} $\gamma\in\Gamma^*$ a $n\in\mathbb{N}$
 
+\emph{Množinu} $L( \,M) \,=\{w\mid w$ \emph{je přijat TS M}$\}\subseteq\Sigma^*$ \emph{nazýváme} jazyk přijímaný TS $M$.
 \end{definition}
+Nyní si vyzkoušíme sazbu vět a důkazů opět s použitím
+balíku \verb|amsthm|.
+
+\begin{sentence}
+\label{veta_1}
+\emph{Třída jazyků, které jsou přijímány TS, odpovídá} rekurzivně vyčíslitelným jazykům.
+\end{sentence}
+
+\begin{proof}
+	V důkaze vyjdeme z Definice 1 a 2.
+\end{proof}
+
+\section{Rovnice a odkazy}
+Složitější matematické formulace sázíme mimo plynulý text. Lze umístit několik výrazů na jeden řádek, ale pak je třeba tyto vhodně oddělit, například příkazem \verb|\quad|.\\
+
+\quad $\sqrt[i]{x_i^3}$ kde $x_i$ je $i$-té sudé číslo \quad $y_i^{2.y_i}\neq y_i^{y_i^{y_i}}$\\
+
+
+V rovnici (1) jsou využity tři typy závorek s různou explicitně definovanou velikostí.
+\begin{equation}
+x =\bigg\{\Big( \,\big[a + b\big] * c\Big)^d \oplus 1 \,\bigg\} \label{rovnice_1}
+\end{equation}
+
+$$
+y = \lim_{x\to\infty} \frac{\sin^2 x + \cos^2x}{\frac{1}{\log_{10}{x}}}
+$$
+V této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{x\to\infty} f(n)$ v normálním odstavci textu. Podobně je to i s dalšími symboly jako $\sum_{i=1}^{n} 2^{i}$ či $\bigcup_{A\in B} A$. V případe vzorců $\lim\limits_{x\to\infty} f(n)$ a $\sum\limits_{i=1}^{n} 2^{i}$ jsme si vynutili méně úspornou sazbu příkazem \verb|\limits|.
+
+\begin{equation}
+\int_{a}^{b} f(x)dx = -\int\displaylimits_{a}^{b} g(x)dx
+\label{rovnice_2}
+\end{equation}
+\begin{equation}
+\overline{\overline{ A\lor B}} \Leftrightarrow \overline{\overline{A} \land \overline{B}}
+\label{rovnice_3}
+\end{equation}
 
 \end{document}
