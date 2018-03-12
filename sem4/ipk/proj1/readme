@@ -1,0 +1,14 @@
+Readme:
+	- Makefile podporuje príkaz make pre obe aplikácie, teda ipk-server a ipk-client, ale aj make server/make client pre samostatnú aplikáciu
+	- po spustení niektorej aplikácie bez vstupných argumentov sa zobrazí nápoveda
+	- typické spustenie serveru: ./ipk-server -p 30100
+	- typické spustenie klienta: ./ipk-client -h merlin -p 30100 -n xnerec00
+	- server vybavuje requesty až do zaslania signálu SIGINT, teda ctrl+c z príkazového riadku
+	- klient po spustení vypíše správu zo serveru na štandardný výstup a skončí
+	- ak klientovej požiadavke nevyhovuje žiadný záznam v súbore etc/passwd, server odošle prázdnu správu
+	- v prípade, že sa na server pokúša pripojiť neznámy klient, ktorý nepozná hlavičku, odošle server správu "Invalid request!"
+
+Obmedzenia:
+	- login zasielaný v requeste má obmedzenú veľkosť, pretože aplikácia nepredpokladá, že sa v súbore etc/passwd môže nachádzať záznam s 1000 znakovým loginom
+	- server nevytvára podprocesy, v jednej chvíli odpovedá jednému klientovi a po vybavení požiadavku odpovie prípadnému ďalšiemu čakajúcemu, v tomto prípade je to prakticky okamžite, pretože na serveri neprebiehajú žiadne náročné výpočty
+	- parameter -h nepodporuje adresy typu IPv6
