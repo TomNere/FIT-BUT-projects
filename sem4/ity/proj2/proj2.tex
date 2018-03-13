@@ -92,7 +92,7 @@ x =\bigg\{\Big( \,\big[a + b\big] * c\Big)^d \oplus 1 \,\bigg\} \label{rovnice_1
 $$
 y = \lim_{x\to\infty} \frac{\sin^2 x + \cos^2x}{\frac{1}{\log_{10}{x}}}
 $$
-V této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{x\to\infty} f(n)$ v normálním odstavci textu. Podobně je to i s dalšími symboly jako $\sum_{i=1}^{n} 2^{i}$ či $\bigcup_{A\in B} A$. V případe vzorců $\lim\limits_{x\to\infty} f(n)$ a $\sum\limits_{i=1}^{n} 2^{i}$ jsme si vynutili méně úspornou sazbu příkazem \verb|\limits|.
+V této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{x\to\infty} f(n)$ v normálním odstavci textu. Podobně je to i s dalšími symboly jako $\sum_{i=1}^{n} 2^{i}$ či $\bigcup_{A\in \mathcal{B}} A$. V případe vzorců $\lim\limits_{x\to\infty} f(n)$ a $\sum\limits_{i=1}^{n} 2^{i}$ jsme si vynutili méně úspornou sazbu příkazem \verb|\limits|.
 
 \begin{equation}
 \int_{a}^{b} f(x)dx = -\int\displaylimits_{a}^{b} g(x)dx
@@ -102,5 +102,52 @@ V této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{x\to\in
 \overline{\overline{ A\lor B}} \Leftrightarrow \overline{\overline{A} \land \overline{B}}
 \label{rovnice_3}
 \end{equation}
+
+\section{Matice}
+Pro sázení matic se velmi často používá prostředí \verb|array| a závorky \verb|\left|, \verb|\right|.
+$$
+\left(
+\begin{array}{ccc}
+a + b & \widehat{\xi + \omega} & \hat{\pi}\\
+\vec{a} & \overleftrightarrow{AC} & \beta
+\end{array}
+\right) = 1 \iff \mathbb{Q} = \mathbb{R}
+$$
+$$
+\left\|
+\begin{array}{cccc}
+a_{11} & a_{12} & \dots  & a_{1n}\\
+a_{11} & a_{12} & \dots  & a_{2n}\\
+\vdots & \vdots & \ddots & \vdots\\
+a_{m1} & a_{m2} & \dots  & a_{mn}
+\end{array}
+\right\| = 
+\left|
+\begin{array}{cc}
+t & u\\
+v & w
+\end{array} 
+\right| = tw-uv
+$$
+
+Prostředí \verb|array| lze úspěšně využít i jinde.
+
+$$
+\left(
+\begin{array}{c}
+n\\
+k
+\end{array}
+\right) =
+\left\{
+\begin{array}{ll}
+\frac{n!}{k!(n-k)!} & \text{pro} 0 \leq k \leq n\\
+0 & \text{pro} k < 0 \text{nebo} k > n
+\end{array}
+\right.
+$$
+
+\section{Závěrem}
+případě, že budete potřebovat vyjádřit matematickou konstrukci nebo symbol a nebude se Vám dařit jej nalézt v samotném \LaTeX u, doporučuji prostudovat možnosti balíku maker \AmS-\LaTeX.
 
 \end{document}
