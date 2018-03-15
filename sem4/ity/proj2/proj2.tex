@@ -3,15 +3,12 @@
 \usepackage[utf8]{inputenc}
 \usepackage[IL2]{fontenc}
 \usepackage{times}
-\usepackage{amsmath}
-\usepackage{amsthm}
-\usepackage{amsfonts}
+\usepackage{amsmath, amsthm, amsfonts}
 \usepackage[left=1.5cm,text={18cm, 25cm},top=2.5cm]{geometry}
-\newcommand{\myuv}[1]{\quotedblbase #1\textquotedblleft}
 
-\theoremstyle{definition}
+\theoremstyle{plain}
 \newtheorem{definition}{Definice}
-\theoremstyle{definition}
+\theoremstyle{plain}
 \newtheorem{sentence}{Věta}
 
 \begin{document}
@@ -21,33 +18,31 @@
 	\textsc{\Huge Fakulta informačních technologií\\[3.5mm]
 			Vysoké učení technické v~Brně}
 	\\[79mm]
-	{\LARGE Typografie a~publikování\,--\,2. projekt\\[1.5mm]
+	{\LARGE Typografie a~publikování\,--\,2. projekt\\[2mm]
 	Sazba dokumentů a~matematických výrazů}
 	\vfill
 \end{center}
 {\Large 2018 \hfill Tomáš Nereča(xnerec00)}
-\\[-4mm]
 \end{titlepage}
 
 \section*{Úvod}
-V~této úloze si vyzkoušíme sazbu titulní strany, matematických vzorců, prostředí a~dalších textových struktur obvyklých pro technicky zaměřené texty (například rovnice~(\ref{rovnice_1}) nebo Definice~\ref{definice_1} na straně~\pageref{definice_1}). Rovněž si vyzkoušíme používání odkazů \verb|\ref| a~\verb|\pageref|.
+V~této úloze si vyzkoušíme sazbu titulní strany, matematických vzorců, prostředí a~dalších textových struktur obvyklých pro technicky zaměřené texty (například rovnice~\eqref{rovnice_1} nebo Definice~\ref{definice_1} na straně~\pageref{definice_1}). Rovněž si vyzkoušíme používání odkazů \verb|\ref| a~\verb|\pageref|.
 
 Na titulní straně je využito sázení nadpisu podle optického středu s~využitím zlatého řezu. Tento postup byl probírán na přednášce. Dále je použito odřádkování se
 zadanou relativní velikostí 0.4em a~0.3em.
 
 \section{Matematický text}
-Nejprve se podíváme na sázení matematických symbolů a~výrazů v~plynulém textu včetně sazby definic a~vět s~využitím balíku \verb|amsthm|. Rovněž použijeme poznámku pod čarou s~použitím příkazu \verb|\footnote| . Někdy je vhodné použít konstrukci \verb|${}$|, která říká, že matematický text nemá být zalomen.
+Nejprve se podíváme na sázení matematických symbolů a~výrazů v~plynulém textu včetně sazby definic a~vět s~využitím balíku \verb|amsthm|. Rovněž použijeme poznámku pod čarou s~použitím příkazu \verb|\footnote|. Někdy je vhodné použít konstrukci \verb|${}$|, která říká, že matematický text nemá být zalomen.
 
 \begin{definition} \label{definice_1}
-Turingův stroj \emph{(TS) je definován jako šestice tvaru $M=(Q,\Sigma,\Gamma,\delta, q_0, q_F)$, kde:}
-
+\textnormal{Turingův stroj} (TS) je definován jako šestice tvaru $M=(Q,\Sigma,\Gamma,\delta, q_0, q_F)$, kde:
 \begin{itemize}
-\item $Q$ \emph{je konečná množina} vnitřních (řídicích) stavů,
-\item $\Sigma$ \emph{je konečná množina symbolů nazývaná} vstupní abeceda, $\Delta \not\in \Sigma$,
-\item $\Gamma$ \emph{je konečná množina symbolů,} $\Sigma\subset \Gamma$, $\Delta\in\Gamma$\emph{, nazývaná} pásková abeceda,
-\item $\delta:(Q\setminus\{q_F\})\times\Gamma\rightarrow Q\times(\Gamma\cup\{L,R\})$\emph{,kde}\,$L,R\not\in\Gamma$, \emph{je parciální} přechodová funkce,
-\item $q_0$ \emph{je} počáteční stav, $q_0\in Q$\:\emph{a}
-\item $q_F$ \emph{je} koncový stav, $q_F\in Q$.
+\item $Q$ je konečná množina \textnormal{vnitřních (řídicích) stavů},
+\item $\Sigma$ je konečná množina symbolů nazývaná \textnormal{vstupní abeceda}, $\Delta \not\in \Sigma$,
+\item $\Gamma$ je konečná množina symbolů, $\Sigma\subset \Gamma$, $\Delta\in\Gamma$, nazývaná \textnormal{pásková abeceda},
+\item $\delta:(Q\setminus\{q_F\})\times\Gamma\rightarrow Q\times(\Gamma\cup\{L,R\})$, kde\ $L,R\not\in\Gamma$, je parciální \textnormal{přechodová funkce},
+\item $q_0$ je \textnormal{počáteční stav}, $q_0\in Q$ a
+\item $q_F$ je \textnormal{koncový stav}, $q_F\in Q$.
 \end{itemize}
 \end{definition}
 
@@ -59,88 +54,83 @@ který reprezentuje obsah pásky a~pozice hlavy na tomto řetězci. Jedná se o~
 
 \subsection{Podsekce obsahující větu a~odkaz}
 \begin{definition} \label{definice_2}
-Řetězec $w$ nad abecedou $\Sigma$ je přijat TS \emph{$M$ jestliže $M$ při aktivaci z~počáteční konfigurace pásky $\underline{\Delta}w\Delta...$ a~počátečního stavu $q_0$ zastaví přechodem do koncového stavu $q_F$, tj. $( \,q_0,\Delta w\Delta^\omega,0) \, \overset{*}{\underset{M}{\vdash}} ( \,q_F,\gamma,n) \,$ pro nějaké $\gamma\in\Gamma^*$ a~$n\in\mathbb{N}$}.
+\textnormal{Řetězec $w$ nad abecedou $\Sigma$ je přijat TS $M$} jestliže $M$ při aktivaci z~počáteční konfigurace pásky $\underline{\Delta}w\Delta...$ a~počátečního stavu $q_0$ zastaví přechodem do koncového stavu $q_F$, tj. $( q_0,\Delta w\Delta^\omega,0) \overset{*}{\underset{M}{\vdash}} (q_F,\gamma,n)$ pro nějaké $\gamma \in \Gamma^*$ a~$n\in\mathbb{N}$.
 
-\emph{Množinu} $L(M)=\{w \mid w\:\text{\emph{je přijat TS}}\:M\}\subseteq\Sigma^*$ \emph{nazýváme} jazyk přijímaný TS $M.$
+Množinu $L(M)=\{w\mid w\ \text{je přijat TS} \ M\}\subseteq\Sigma^*$ nazýváme \textnormal{jazyk přijímaný TS $M.$}
 \end{definition}
 Nyní si vyzkoušíme sazbu vět a~důkazů opět s~použitím
 balíku \verb|amsthm|.
 \begin{sentence} \label{veta_1}
-\emph{Třída jazyků, které jsou přijímány TS, odpovídá} rekurzivně vyčíslitelným jazykům.
+Třída jazyků, které jsou přijímány TS, odpovídá \textnormal{rekurzivně vyčíslitelným jazykům}.
 \end{sentence}
-
 \begin{proof} \label{dukaz_1}
-	V~důkaze vyjdeme z~Definice 1 a~2.
+V~důkaze vyjdeme z~Definice \ref{definice_1} a~\ref{definice_2}.
 \end{proof}
 
 \section{Rovnice a~odkazy}
-Složitější matematické formulace sázíme mimo plynulý text. Lze umístit několik výrazů na jeden řádek, ale pak je třeba tyto vhodně oddělit, například příkazem \verb|\quad|.\\
-
-\quad $\sqrt[i]{x_i^3}$ kde $x_i$ je $i$-té sudé číslo \quad $y_i^{2.y_i}\neq y_i^{y_i^{y_i}}$\\
-
-
-V~rovnici (1) jsou využity tři typy závorek s~různou explicitně definovanou velikostí.
-\begin{equation}\label{rovnice_1}
-x =\bigg\{\Big( \,\big[a + b\big] * c\Big)^d \oplus 1 \,\bigg\} 
-\end{equation}
+Složitější matematické formulace sázíme mimo plynulý text. Lze umístit několik výrazů na jeden řádek, ale pak je třeba tyto vhodně oddělit, například příkazem \verb|\quad|.
 
 $$
-y = \lim_{x\to\infty} \frac{\sin^2 x + \cos^2x}{\frac{1}{\log_{10}{x}}}
+\sqrt[i]{x_i^3}\quad\text{kde}\ x_i\ \text{je}\ i\text{-té sudé číslo} \quad y_i^{2\cdot y_i}\neq y_i^{y_i^{y_i}}
 $$
-V~této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{x\to\infty} f(n)$ v~normálním odstavci textu. Podobně je to i s~dalšími symboly jako $\sum_{i=1}^{n} 2^{i}$ či $\bigcup_{A\in \mathcal{B}} A$. V~případe vzorců $\lim\limits_{x\to\infty} f(n)$ a~$\sum\limits_{i=1}^{n} 2^{i}$ jsme si vynutili méně úspornou sazbu příkazem \verb|\limits|.
 
-\begin{equation}\label{rovnice_2}
-\int_{a}^{b} f(x)dx = -\int\displaylimits_{a}^{b} g(x)dx
-\end{equation}
-\begin{equation}\label{rovnice_3}
-\overline{\overline{ A\lor B}} \Leftrightarrow \overline{\overline{A} \land \overline{B}}
-\end{equation}
+V~rovnici \eqref{rovnice_1} jsou využity tři typy závorek s~různou explicitně definovanou velikostí.
+
+\begin{align} \label{rovnice_1}
+&x\quad=\quad\bigg\{\Big(\big[a + b\big] * c\Big)^d \oplus 1 \,\bigg\}\\
+\nonumber &y\quad=\quad\lim_{x\to\infty}\frac{\sin^2x+ \cos^2x}{\frac{1}{\log_{10}{x}}}
+\end{align}
+
+V~této větě vidíme, jak vypadá implicitní vysázení limity $\lim_{n\to\infty}f(n)$ v~normálním odstavci textu. Podobně je to i s~dalšími symboly jako $\sum_{i=1}^{n} 2^{i}$ či $\bigcup_{A\in \mathcal{B}} A$. V~případě vzorců $\lim\limits_{n\to\infty} f(n)$ a~$\sum\limits_{i=1}^{n} 2^{i}$ jsme si vynutili méně úspornou sazbu příkazem \verb|\limits|.
+
+
+\begin{align}\label{rovnice_2}
+\int\displaylimits_{a}^{b}f(x)\,\mathrm{d}x\quad&=\quad-\int_{b}^{a}g(x)\,\mathrm{d}x\\
+\overline{\overline{A\lor B}}\quad&\Leftrightarrow\quad \overline{\overline{A}\land\overline{B}}
+\end{align}
 
 \section{Matice}
-Pro sázení matic se velmi často používá prostředí \verb|array| a~závorky \verb|\left|, \verb|\right|.
+Pro sázení matic se velmi často používá prostředí \verb|array| a~závorky (\verb|\left|, \verb|\right|).
+
 $$
 \left(
 \begin{array}{ccc}
 a + b & \widehat{\xi + \omega} & \hat{\pi}\\
-\vec{a} & \overleftrightarrow{AC} & \beta
+\vec{a}&\overleftrightarrow{AC}&\beta
 \end{array}
-\right) = 1 \iff \mathbb{Q} = \mathbb{R}
+\right)=1\!\iff\!\mathbb{Q}=\mathbb{R}
 $$
+
 $$
-\left\|
+\mathbf{A}=\left\|
 \begin{array}{cccc}
-a_{11} & a_{12} & \dots  & a_{1n}\\
-a_{11} & a_{12} & \dots  & a_{2n}\\
-\vdots & \vdots & \ddots & \vdots\\
-a_{m1} & a_{m2} & \dots  & a_{mn}
+a_{11} & a_{12} & \dots & a_{1n}\\
+a_{21} & a_{22} & \dots & a_{2n}\\
+\vdots & \vdots &\ddots& \vdots\\
+a_{m1} & a_{m2} & \dots & a_{mn}
 \end{array}
-\right\| = 
+\right\|=
 \left|
-\begin{array}{cc}
-t & u\\
-v & w
+\begin{array}{ll}
+t&u\\
+v&w
 \end{array} 
-\right| = tw-uv
+\right|=tw-uv
 $$
 
 Prostředí \verb|array| lze úspěšně využít i jinde.
 
 $$
-\left(
-\begin{array}{c}
-n\\
-k
-\end{array}
-\right) =
+\binom{n}{k} =
 \left\{
 \begin{array}{ll}
-\frac{n!}{k!(n-k)!} & \text{pro} 0 \leq k \leq n\\
-0 & \text{pro} k < 0 \text{nebo} k > n
+\frac{n!}{k!(n-k)!} &\ \text{pro}\ 0 \leq k\ \leq n\\
+0 &\ \text{pro}\ k\ <0\ \text{nebo}\ k\ >n
 \end{array}
 \right.
 $$
 
 \section{Závěrem}
-případě, že budete potřebovat vyjádřit matematickou konstrukci nebo symbol a~nebude se Vám dařit jej nalézt v~samotném \LaTeX u, doporučuji prostudovat možnosti balíku maker \AmS-\LaTeX.
+V případě, že budete potřebovat vyjádřit matematickou konstrukci nebo symbol a~nebude se Vám dařit jej nalézt v~samotném \LaTeX u, doporučuji prostudovat možnosti balíku maker \AmS-\LaTeX.
 
 \end{document}
