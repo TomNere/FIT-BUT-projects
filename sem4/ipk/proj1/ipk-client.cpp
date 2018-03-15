@@ -10,7 +10,7 @@ using namespace std;
 
 // Error messages...
 const string client_help = "Invalid parameters!\n Usage: ./ipk-client -h host -p port [-n|-f|-l] login\n"
-                           "       ./ipk-client -h host -p port -l\n";
+                           "        ./ipk-client -h host -p port -l\n";
 #define ERR_RET(message) cerr << message << endl; exit(EXIT_FAILURE);
 
 // Class representing all information about request
@@ -34,7 +34,7 @@ class InputInfo {
     // Validate arguments
     void validate() {
         if (!host.compare("") || !port.compare("")) {           // Check for host and port
-            ERR_RET("Missing parameters!");
+            ERR_RET(client_help);
         }
 
         if (isdigit(host[0])) {         // If digit, check for valid IPv4 server_address
@@ -42,7 +42,7 @@ class InputInfo {
             in_addr tmp_ip;
 
             if (inet_pton(AF_INET, host.c_str(), &tmp_ip) != 1) {
-                ERR_RET("Invalid IP server_address!");
+                ERR_RET("Invalid IP address!");
             }
         }
        
@@ -56,20 +56,20 @@ class InputInfo {
         }
 
         if (req_type == 0) {                // Missing [n|f|l]
-            ERR_RET("Missing parameters!");
+            ERR_RET(client_help);
         }
 
         if (req_type != 3) {                // Login is required for -n and -f
             if(!login.compare("")) {
-                ERR_RET("Missing parameters!");       
+                ERR_RET(client_help);       
             }
         }
 
-        if (login.length() > (1022 - 1)) {  // Too long login to send in 1 buffer
+        req_message = "<--xnerec00_protocol-->&" + to_string(req_type) + "&" + login;    // Message sent to server
+
+        if (req_message.length() > 1023) {  // Too long login to send in 1 buffer
             ERR_RET("Unsupported length of login!"); 
         }
-
-        req_message = to_string(req_type) + "&" + login;    // Message sent to server
     }
 };
 
@@ -83,7 +83,7 @@ void request(InputInfo info) {
     // Set timeout
     // (https://stackoverflow.com/questions/30395258/setting-timeout-to-recv-function)
     struct timeval tv;
-    tv.tv_sec = 15;        // 15 Secs Timeout
+    tv.tv_sec = 10;        // 10 Secs Timeout
     tv.tv_usec = 0;        // Not init'ing this can cause strange errors
     setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
     // Get network host entry
@@ -149,33 +149,33 @@ int main(int argc, char const *argv[])
         switch(option) {
             case 'h':
                 if (info.host.compare("")) {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 info.host = string(optarg);
                 break;
             case 'p':
                 if (info.port.compare("")) {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 info.port = string(optarg);
                 break;
             case 'n':
                 if (info.req_type != 0) {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 info.req_type = 1;
                 info.login = string(optarg);
                 break;
             case 'f':
                 if (info.req_type != 0) {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 info.req_type = 2;
                 info.login = string(optarg);
                 break;
             case 'l':
                 if (info.req_type != 0) {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 info.req_type = 3;
                 info.login = string(optarg);
@@ -185,11 +185,11 @@ int main(int argc, char const *argv[])
                     info.req_type = 3;
                 }
                 else {
-                    ERR_RET("Invalid parameters!");
+                    ERR_RET(client_help);
                 }
                 break;
             default:
-                ERR_RET("Invalid parameters!");
+                ERR_RET(client_help);
         }
     }
 

@@ -38,13 +38,23 @@ string parseReq(string req_message) {
     ifstream file;
     file.open("/etc/passwd");
 
+    if (!file) {
+        return "";
+    }
+
     string line, lines;
     line = lines = "";
 
-    switch(req_message[0]) {        // First character in req_message is type of request
+    if ((req_message.substr(0, req_message.find("&")).compare("<--xnerec00_protocol-->") != 0) || req_message.length() < string("<--xnerec00_protocol-->&1").length()) {
+        return "Invalid request!\n";
+    }
+
+    string login = req_message.substr(req_message.find("&") + 3);
+
+    switch(req_message[req_message.find("&") + 1]) {        // First character in req_message is type of request
         case '1':                   // -n parameter - name
             while(getline(file, line)) {
-                if (line.substr(0, line.find(":")).compare(req_message.substr(2)) == 0) {   // If login was found
+                if (line.substr(0, line.find(":")).compare(login) == 0) {   // If login was found
                     file.close();
                     return getSubstr(line, 4);    // Name is after 4. ':'
                 }
@@ -52,22 +62,22 @@ string parseReq(string req_message) {
             break;
         case '2':                   // -f parameter - home folder
             while(getline(file, line)) {
-                if (line.substr(0, line.find(":")).compare(req_message.substr(2)) == 0) {   // If login was found
+                if (line.substr(0, line.find(":")).compare(login) == 0) {   // If login was found
                     file.close();
                     return getSubstr(line, 5);    // Home folder is after 5. ':'
                 }
             }
             break;
         case '3':                   // -l parameter - login
-            if ((req_message.substr(2)).compare("") == 0) {            // If no login, create string of all logins
+            if (login.compare("") == 0) {            // If no login, create string of all logins
                 while(getline(file, line)) {
                     lines = lines + line.substr(0, line.find(":")) + "\n";
                 }
             }
             else {
-                int length = req_message.length() - 2;      // - 2 -> first two characters 
+                int length = login.length(); 
                 while(getline(file, line)) {
-                    if (line.substr(0, length).compare(req_message.substr(2)) == 0) {  // Find match with prefix
+                    if (line.substr(0, length).compare(login) == 0) {  // Find match with prefix
                         lines = lines + line.substr(0, line.find(":")) + "\n";
                     }
                 }
@@ -90,7 +100,7 @@ void listen(string port) {
     // (https://stackoverflow.com/questions/24194961/how-do-i-use-setsockoptso-reuseaddr)
     int enable = 1;
     if (setsockopt(welcome_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        ERR_RET("setsockopt(SO_REUSEADDR) failed!");
+        ERR_RET("Error setting setsockopt(SO_REUSEADDR)!");
     }
 
     // Create necessary structures for Bind
@@ -113,11 +123,11 @@ void listen(string port) {
     // Create necessary structures for Accept
     struct sockaddr_in sa_client;
     socklen_t sa_client_len = sizeof(sa_client);
+    const int BUFSIZE = 1024;
 
     while(1) {
         // Accept
         int comm_socket = accept(welcome_socket, (struct sockaddr*)&sa_client, &sa_client_len);
-        const int BUFSIZE = 1024;
         if (comm_socket > 0) {
             char buff[BUFSIZE];
             int res = 0;
@@ -125,7 +135,9 @@ void listen(string port) {
 
             // Receiving 1 request message
             if ((res = recv(comm_socket, buff, BUFSIZE, 0)) < 0) {
-                ERR_RET("Error receiving from client!");
+                cerr << "Error receiving from client!" << endl;
+                close(comm_socket);
+                continue;
             }
 
             // Call function to create a string to send
@@ -137,17 +149,16 @@ void listen(string port) {
             // Sending buffers of data in loop
             // Notice \0 character at the end of C-style string
             while(size_to_send + 1) {
-                if (size_to_send > 1023) {  
-                    tmp = data_to_send.substr(0, 1023);
-                    data_to_send.erase(0, 1023);
-                    size_to_send = size_to_send - 1023;
+                if (size_to_send > (BUFSIZE - 1)) {  
+                    tmp = data_to_send.substr(0, BUFSIZE - 1);
+                    data_to_send.erase(0, BUFSIZE - 1);
+                    size_to_send = size_to_send - (BUFSIZE - 1);
                 }
                 else {
                     tmp = data_to_send;
                     size_to_send = -1;
                 }
                 send(comm_socket, tmp.c_str(), tmp.length() + 1, 0);
-
                 // Receiving OK message
                 if (((res = recv(comm_socket, buff, BUFSIZE, 0)) < 0) || strcmp(buff, "OK")) {
                     cerr << "Error receiving OK message!" << endl;

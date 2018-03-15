@@ -1,5 +1,9 @@
-Readme:
-	- Makefile podporuje príkaz make pre obe aplikácie, teda ipk-server a ipk-client, ale aj make server/make client pre samostatnú aplikáciu
+Aplikačný protokol realizujúci prenos informácií o používateľoch na strane serveru.
+
+
+Základné informácie:
+	- Makefile má cieľ all pre obe aplikácie, teda ipk-server a ipk-client
+	- Pre preklad samostatných aplikácií má ciele make server/make client a cieľ clean pre vymazanie binárnych súborov
 	- po spustení niektorej aplikácie bez vstupných argumentov sa zobrazí nápoveda
 	- typické spustenie serveru: ./ipk-server -p 30100
 	- typické spustenie klienta: ./ipk-client -h merlin -p 30100 -n xnerec00
