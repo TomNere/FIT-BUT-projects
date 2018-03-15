@@ -1,0 +1,5 @@
+.ipPcodE18
+
+# only `string` is accepted not `stRinG`
+
+WRITE stRinG@NotAValidOperand

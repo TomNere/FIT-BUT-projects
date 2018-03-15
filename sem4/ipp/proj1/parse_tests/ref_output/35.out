@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode18">
+ <instruction order="1" opcode="CONCAT">
+  <arg1 type="var">GF@foo</arg1>
+  <arg2 type="int">12</arg2>
+  <arg3 type="int">13</arg3>
+ </instruction>
+</program>
+ 

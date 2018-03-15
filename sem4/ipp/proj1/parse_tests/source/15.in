@@ -1,0 +1,39 @@
+.IPPcode18
+
+#Author: xgolds00
+
+MOVE LF@&zap bool@true               
+CREATEFRAME #No operands at all
+POPFRAME#Comment sticked to instruction
+DEFVAR TF@abcdefghtijklmnopqrdsw_123456789
+CALL CALL #Label with the same name as instruction              
+RETURN
+#RETURN nonreturn - commented invalid instruction out
+PUSHS string@Nějaké\032UNICODE\032kódy            
+POPS GF@_-$&%*14000 #Variable with special characters
+ADD LF@_superb9 int@-2 int@+0
+SUB GF@*timbers int@55 int@-55              
+IDIV TF@%%__1 int@0 int@1
+LT LF@LT TF@random1 GF@random2
+GT TF@___ bool@true bool@false
+EQ GF@booly string@Ohmygod string@Ohmygosh             
+AND LF@easy bool@true bool@true
+OR LF@easy bool@false bool@true
+NOT GF@global bool@false         
+INT2CHAR LF@strval string@ž
+STRI2INT GF@&&& TF@string int@1           
+READ LF@ready int
+     READ LF@ready bool                  
+          READ LF@ready string
+WRITE string@Trochu/032víc/032UNICODEššš
+          CONCAT TF@_socket string@NormalString LF@stringvar
+      STRLEN TF@zumzum string@+ěščřžýáíé=
+GETCHAR LF@&getcvar string@balls LF@pos
+SETCHAR TF@CPP int@3 string@∀αβγδεζηθικλμνξοπρςτυφχψω #mathematical symbols
+TYPE LF@trivial string@×✕✖÷               #
+LABEL _MYLABEL
+JUMP _MYLABEL
+jUmpIfEq label string@something LF@prem      # case-insensitive instruction
+jumpifneq mylab int@-99 int@+99
+dprinT string@Vypiš\032chybu
+BREAK

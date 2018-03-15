@@ -1,0 +1,5 @@
+     .IppCodE18
+
+# var can not start with number - same applies for label
+
+    DefVar      GF@9itEndsHere

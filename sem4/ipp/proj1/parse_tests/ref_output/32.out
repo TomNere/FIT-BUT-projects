@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode18">
+ <instruction order="1" opcode="DEFVAR">
+  <arg1 type="var">LF@*1some</arg1>
+ </instruction>
+ <instruction order="2" opcode="MOVE">
+  <arg1 type="var">TF@___________________82</arg1>
+  <arg2 type="string"></arg2>
+ </instruction>
+</program>
+ 

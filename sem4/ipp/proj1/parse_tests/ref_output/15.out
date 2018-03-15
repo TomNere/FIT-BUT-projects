@@ -1,0 +1,133 @@
+<?xml version="1.0"?>
+<program language="IPPcode18">
+   <instruction order="1" opcode="MOVE">
+      <arg1 type="var">LF@&amp;zap</arg1>
+      <arg2 type="bool">true</arg2>
+   </instruction>
+   <instruction order="2" opcode="CREATEFRAME"/>
+   <instruction order="3" opcode="POPFRAME"/>
+   <instruction order="4" opcode="DEFVAR">
+      <arg1 type="var">TF@abcdefghtijklmnopqrdsw_123456789</arg1>
+   </instruction>
+   <instruction order="5" opcode="CALL">
+      <arg1 type="label">CALL</arg1>
+   </instruction>
+   <instruction order="6" opcode="RETURN"/>
+   <instruction order="7" opcode="PUSHS">
+      <arg1 type="string">Nějaké\032UNICODE\032kódy</arg1>
+   </instruction>
+   <instruction order="8" opcode="POPS">
+      <arg1 type="var">GF@_-$&amp;%*14000</arg1>
+   </instruction>
+   <instruction order="9" opcode="ADD">
+      <arg1 type="var">LF@_superb9</arg1>
+      <arg2 type="int">-2</arg2>
+      <arg3 type="int">+0</arg3>
+   </instruction>
+   <instruction order="10" opcode="SUB">
+      <arg1 type="var">GF@*timbers</arg1>
+      <arg2 type="int">55</arg2>
+      <arg3 type="int">-55</arg3>
+   </instruction>
+   <instruction order="11" opcode="IDIV">
+      <arg1 type="var">TF@%%__1</arg1>
+      <arg2 type="int">0</arg2>
+      <arg3 type="int">1</arg3>
+   </instruction>
+   <instruction order="12" opcode="LT">
+      <arg1 type="var">LF@LT</arg1>
+      <arg2 type="var">TF@random1</arg2>
+      <arg3 type="var">GF@random2</arg3>
+   </instruction>
+   <instruction order="13" opcode="GT">
+      <arg1 type="var">TF@___</arg1>
+      <arg2 type="bool">true</arg2>
+      <arg3 type="bool">false</arg3>
+   </instruction>
+   <instruction order="14" opcode="EQ">
+      <arg1 type="var">GF@booly</arg1>
+      <arg2 type="string">Ohmygod</arg2>
+      <arg3 type="string">Ohmygosh</arg3>
+   </instruction>
+   <instruction order="15" opcode="AND">
+      <arg1 type="var">LF@easy</arg1>
+      <arg2 type="bool">true</arg2>
+      <arg3 type="bool">true</arg3>
+   </instruction>
+   <instruction order="16" opcode="OR">
+      <arg1 type="var">LF@easy</arg1>
+      <arg2 type="bool">false</arg2>
+      <arg3 type="bool">true</arg3>
+   </instruction>
+   <instruction order="17" opcode="NOT">
+      <arg1 type="var">GF@global</arg1>
+      <arg2 type="bool">false</arg2>
+   </instruction>
+   <instruction order="18" opcode="INT2CHAR">
+      <arg1 type="var">LF@strval</arg1>
+      <arg2 type="string">ž</arg2>
+   </instruction>
+   <instruction order="19" opcode="STRI2INT">
+      <arg1 type="var">GF@&amp;&amp;&amp;</arg1>
+      <arg2 type="var">TF@string</arg2>
+      <arg3 type="int">1</arg3>
+   </instruction>
+   <instruction order="20" opcode="READ">
+      <arg1 type="var">LF@ready</arg1>
+      <arg2 type="type">int</arg2>
+   </instruction>
+   <instruction order="21" opcode="READ">
+      <arg1 type="var">LF@ready</arg1>
+      <arg2 type="type">bool</arg2>
+   </instruction>
+   <instruction order="22" opcode="READ">
+      <arg1 type="var">LF@ready</arg1>
+      <arg2 type="type">string</arg2>
+   </instruction>
+   <instruction order="23" opcode="WRITE">
+      <arg1 type="string">Trochu/032víc/032UNICODEššš</arg1>
+   </instruction>
+   <instruction order="24" opcode="CONCAT">
+      <arg1 type="var">TF@_socket</arg1>
+      <arg2 type="string">NormalString</arg2>
+      <arg3 type="var">LF@stringvar</arg3>
+   </instruction>
+   <instruction order="25" opcode="STRLEN">
+      <arg1 type="var">TF@zumzum</arg1>
+      <arg2 type="string">+ěščřžýáíé=</arg2>
+   </instruction>
+   <instruction order="26" opcode="GETCHAR">
+      <arg1 type="var">LF@&amp;getcvar</arg1>
+      <arg2 type="string">balls</arg2>
+      <arg3 type="var">LF@pos</arg3>
+   </instruction>
+   <instruction order="27" opcode="SETCHAR">
+      <arg1 type="var">TF@CPP</arg1>
+      <arg2 type="int">3</arg2>
+      <arg3 type="string">∀αβγδεζηθικλμνξοπρςτυφχψω</arg3>
+   </instruction>
+   <instruction order="28" opcode="TYPE">
+      <arg1 type="var">LF@trivial</arg1>
+      <arg2 type="string">×✕✖÷</arg2>
+   </instruction>
+   <instruction order="29" opcode="LABEL">
+      <arg1 type="label">_MYLABEL</arg1>
+   </instruction>
+   <instruction order="30" opcode="JUMP">
+      <arg1 type="label">_MYLABEL</arg1>
+   </instruction>
+   <instruction order="31" opcode="JUMPIFEQ">
+      <arg1 type="label">label</arg1>
+      <arg2 type="string">something</arg2>
+      <arg3 type="var">LF@prem</arg3>
+   </instruction>
+   <instruction order="32" opcode="JUMPIFNEQ">
+      <arg1 type="label">mylab</arg1>
+      <arg2 type="int">-99</arg2>
+      <arg3 type="int">+99</arg3>
+   </instruction>
+   <instruction order="33" opcode="DPRINT">
+      <arg1 type="string">Vypiš\032chybu</arg1>
+   </instruction>
+   <instruction order="34" opcode="BREAK"/>
+</program>

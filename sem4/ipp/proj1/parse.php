@@ -12,6 +12,12 @@ const ARG_ERR = 10;
 const SYN_ERR = 21;
 const E_O_F = -1;
 const ERR = -2;
+const LF = 10;
+const SHARP = 35;
+const CR = 13;
+const TAB = 9;
+const SPACE = 32;
+const BACKSLASH = 92;
 
 /**********************GLOBAL VARIABLES*********************/
 $params;
@@ -86,17 +92,17 @@ function terminate($code, $str) {
 function skipWhite() {
     $c;
     while (!(($c = fgetc(STDIN)) === false)) {       // Repeat until E_O_F
-        if (strcmp($c, chr(35)) == 0) {         // # - comment
+        if (ord($c) == SHARP) {         // # - comment
             skipComment();
             return "#";
         }
-        else if (strcmp($c, "\n") == 0) {       // New line
+        else if (ord($c) == LF) {       // New line
             $GLOBALS['line_count']++;
             return "\n";
         }
-        if (strcmp($c, "\r") == 0) {
+        if (ord($c) == CR) {
             $c = fgetc(STDIN);
-            if (strcmp($c, "\n") == 0) {
+            if (ord($c) == LF) {
                 $GLOBALS['line_count']++;
                 return "\n";
             }
@@ -123,24 +129,24 @@ function skipComment() {
 *              - false if not
 */
 function nlcCheck($c) {
-    if (strcmp($c, "\n") == 0) {
+    if (ord($c) == LF) {
         $GLOBALS['line_count']++;
         return true;
     }
-    if (strcmp($c, "\r") == 0) {
+    if (ord($c) == CR) {
         $c = fgetc(STDIN);
-        if (strcmp($c, "\n") == 0) {
+        if (ord($c) == LF) {
             $GLOBALS['line_count']++;
             return true;
         }
         else
             terminate(SYN_ERR, "Unsupported line-ending!");
     }
-    if (strcmp($c, chr(35)) == 0) {
+    if (ord($c) == SHARP) {
         skipComment();
         return true;
     }
-    if (strcmp($c, "\t") == 0 || strcmp($c, " ") == 0)
+    if ((ord($c) == TAB) || ord($c) == SPACE)
         return true;
     return false;
 }
@@ -165,7 +171,7 @@ function getString() {
     while(!(($c = fgetc(STDIN)) === false)) {
         if (nlcCheck($c))                                       // End of string
             break;
-        if (strcmp($c, chr(92)) == 0) {                         // Escape sequence
+        if (ord($c) == BACKSLASH) {                         // Escape sequence
             $str = $str.chr(92).getEscape();
             continue;
         }
@@ -184,16 +190,19 @@ function getInt() {
     $c = fgetc(STDIN);
     $number;
 
-    if (is_numeric($c) || strcmp($c, "+") == 0 || strcmp($c, "-") == 0)     // Optional + or -
+    if (ctype_digit($c) || ord($c) == ord("+") || ord($c) == ord("-"))     // Optional + or -
         $number = $c;
     else
         terminate(SYN_ERR, "Invalid integer constant.");
 
     while (!(($c = fgetc(STDIN)) === false)) {             // Check for digits
-        if (is_numeric($c))
+        if (ctype_digit($c))
             $number.=$c;
-        else
+        else {
+            if (strcmp($number, "+") == 0 || strcmp($number, "-") == 0)
+                terminate(SYN_ERR, "Empty integer constant.");                
             break;
+        }
     }
 
     if (nlcCheck($c))                               // Valid number
@@ -269,7 +278,7 @@ function getFrame(&$frame, $is_type) {
                 break;
         }
 
-        if (strcmp($c, "@") != 0 && $is_type == false)  // If is_type is false, @ is expected after type
+        if ((ord($c) != ord("@")) && ($is_type == false))  // If is_type is false, @ is expected after type
             terminate(SYN_ERR, "@ expected.");
 
         if ($is_type == true) {                             
@@ -327,7 +336,7 @@ function getVarLab($is_var) {
 function getInst() {
     $op_code = skipWhite();
 
-    while (strcmp($op_code, "\n") == 0 || strcmp($op_code, "#") == 0)   // Skip empty lines and comments
+    while (ord($op_code) == LF || ord($op_code) == SHARP)   // Skip empty lines and comments
         $op_code = skipWhite();
 
     if ($op_code == E_O_F)
@@ -339,7 +348,7 @@ function getInst() {
     $no_arg = false;                                            // Signalize operation code without arguments
 
     while (!(($c = fgetc(STDIN)) === false)) {
-        if (strcmp($c, " ") == 0 || strcmp($c, "\t") == 0) {
+        if (ord($c) == SPACE || ord($c) == TAB) {
             break;
         }
         if (nlcCheck($c)) {                                     // Operation code must not have arguments
@@ -398,14 +407,14 @@ function argHandle() {
 
     if ($argc == 2) {
         if (isset($params["help"])) {
-            print ( "Usage:\n".
+            print ( "Použití:\n".
                     "   php5.6 parse.php\n".
                     "   php5.6 parse.php --help\n".
                     "   php5.6 parse.php --stats=file [--loc] [--comments]\n\n".
-                    "   --help       This help\n".
-                    "   --stats=file Statistics about source file are logged to given file\n".
-                    "   --loc        Number of lines with instructions are logged\n".
-                    "   --comments   Number of lines with comments are logged\n");
+                    "   --help          Zobrazí nápovědu\n".
+                    "   --stats=file    Soubor, do kterého jsou zapisovány agregované statistiky\n".
+                    "   --loc           Do souboru bude zapsána informace o počtu řádků s instrukcemi\n".
+                    "   --comments      Do souboru bude zapsána informace o počtu řádků s komentáři\n");
             exit(0);
         }
         else if (isset($params["stats"])) {
@@ -438,11 +447,10 @@ function argHandle() {
 argHandle();                                            // Check for arguments
 
 // First line check
-$tmp = rtrim(fgets(STDIN));
+$tmp = fgets(STDIN, 11);
 
-    if (strcasecmp($tmp, ".ippcode18") != 0)            // Case insensitive 
-        terminate(SYN_ERR, ".IPPcode18 is missing!");
-$line_count++; 
+if (strcasecmp($tmp, ".ippcode18") != 0)            // Case insensitive 
+    terminate(SYN_ERR, ".IPPcode18 is missing!");
 
 // Create basic XML
 $xml_el = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><program language="IPPcode18"></program>');
@@ -499,7 +507,7 @@ while (true) {                      // Repeat until error or E_O_F
 
     if (($line_count - $actual_line) == 0) {                    // Check for new line after arguments
         $c = skipWhite();
-        if (strcmp($c, "\n") && strcmp($c, "#") && $c != E_O_F)   // Unexpected character after arguments
+        if ((ord($c) != LF) && (ord($c) != SHARP) && ($c != E_O_F))   // Unexpected character after arguments
             terminate(SYN_ERR, "Unexpected argument(s).");    
     }
     else if (($line_count - $actual_line) != 1)

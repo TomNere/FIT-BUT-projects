@@ -1,0 +1,5 @@
+.ippcode18
+
+# operand is case sensitive only `int` is allowed
+
+WRITE iNt@15354879878
