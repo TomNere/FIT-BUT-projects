@@ -1,0 +1,110 @@
+def iCreateFrame():
+    return ""
+def iPushFrame():
+    return ""
+def iPopFrame():
+    return ""
+def iReturn():
+    return ""
+def iBreak():
+    return ""
+def iDefVar():
+    return ""
+def iCall():
+    return ""
+def iPushs():
+    return ""
+def iPops():
+    return ""
+def iWrite():
+    return ""
+def iLabel():
+    return ""
+def iLabel():
+    return ""
+def iJump():
+    return ""
+def iDPrint():
+    return ""
+def iMove():
+    return ""
+def iInt2char():
+    return ""
+def iRead():
+    return ""
+def iStrLen():
+    return ""
+def iType():
+    return ""
+def iAdd():
+    return ""
+def iSub():
+    return ""
+def iMul():
+    return ""
+def iIDiv():
+    return ""
+def iLt():
+    return ""
+def iGt():
+    return ""
+def iEq():
+    return ""
+def iAnd():
+    return ""
+def iOr():
+    return ""
+def iNot():
+    return ""
+def iStri2int():
+    return ""
+def iConcat():
+    return ""
+def iGetChar():
+    return ""
+def iSetChar():
+    return ""
+def iJumpIfEq():
+    return ""
+def iJumpIfNEq():
+    return ""
+
+def mainSwitch(inst):
+    switcher = {
+        'CREATEFRAME': iCreateFrame,
+        'PUSHFRAME': iPushFrame,
+        'POPFRAME': iPopFrame,
+        'RETURN': iReturn,
+        'BREAK': iBreak,
+        'DEFVAR': iDefVar,
+        'CALL': iCall,
+        'PUSHS': iPushs,
+        'POPS': iPops,
+        'WRITE': iWrite,
+        'LABEL': iLabel,
+        'JUMP': iJump,
+        'DPRINT': iDPrint,
+        'MOVE': iMove,
+        'INT2CHAR': iInt2char,
+        'READ': iRead,
+        'STRLEN': iStrLen,
+        'TYPE': iType,
+        'ADD': iAdd,
+        'SUB': iSub,
+        'MUL': iMul,
+        'IDIV': iIDiv,
+        'LT': iLt,
+        'GT': iGt,
+        'EQ': iEq,
+        'AND': iAnd,
+        'OR': iOr,
+        'NOT': iNot,
+        'STRI2INT': iStri2int,
+        'CONCAT': iConcat,
+        'GETCHAR': iGetChar,
+        'SETCHAR': iSetChar,
+        'JUMPIFEQ': iJumpIfEq,
+        'JUMPIFNEQ': iJumpIfNEq
+    }
+    func = switcher.get(inst, Lambda: "Unknown"))
+    func()
