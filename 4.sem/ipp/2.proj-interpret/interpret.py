@@ -17,11 +17,11 @@ def iReturn():
 def iBreak():
     return ""
 
-def iDefVar():
-    inst = allInst.getInst()
+def iDefVar(inst):
     name = inst['args'][0]['text']
-    print(name)
-
+    frame = getFrame(name[:2])
+    name = name[3:]
+    frame.update({name: {'type': None, 'value': None}})
 
 def iCall():
     return ""
@@ -47,8 +47,14 @@ def iJump():
 def iDPrint():
     return ""
 
-def iMove():
-    return ""
+def iMove(inst):
+    if inst['args'][1]['type'] != 'var':        # Constant
+        frame = getFrame(inst['args'][0]['text'][:2])
+        if inst['args'][0]['text'][3:] in frame:
+            frame.update({inst['args'][0]['text'][3:]: {'type': inst['args'][1]['type'], 'value': inst['args'][1]['text']}})
+        else:
+            exit(31)
+    pprint(frame)
 
 def iInt2char():
     return ""
@@ -110,6 +116,14 @@ def iJumpIfEq():
 def iJumpIfNEq():
     return ""
 
+def getFrame(frame):
+    if frame == 'GF':
+        return global_frame
+    elif frame == 'LF':
+        pass
+    elif frame == 'TF':
+        pass
+
 def mainSwitch(inst):
     switcher = {
         'CREATEFRAME': iCreateFrame,
@@ -149,7 +163,7 @@ def mainSwitch(inst):
     }
 
     func = switcher.get(inst, lambda: "Unknown")
-    func()
+    func(allInst.getInst())
 
 """ Class representing array of all instructions
 #   Include program counter
@@ -197,11 +211,10 @@ def createArr(arr, labels, path):
         if child.tag == 'instruction':              # If instruction, add to array
             args = []
             if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
-                label = {
-                    'name': child.text,
-                    'pos': child.attrib['order']
-                }
-                labels.append(label)
+                arg = child.getchildren()
+                if arg[0].text in label_arr:
+                    exit(31)
+                label_arr.update({arg[0].text: child.attrib['order']})
             else:
                 for arg in child:                   # Iterate in arguments
                     arg = {
@@ -215,9 +228,9 @@ def createArr(arr, labels, path):
 
 
 """""""""""""""""""""""""""""""""""""""""""""""Global variables"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-label_arr = []          # Array of all labels
+label_arr = {}          # Array of all labels
 allInst = InstArr()
-global_frame = []       # Array of variables in global frame
+global_frame = {}       # Array of variables in global frame
 
 
 def main():
@@ -231,7 +244,6 @@ def main():
 
     global label_arr
     global allInst
-
     createArr(allInst, label_arr, path)
 
     # Iterate in all instructions
@@ -241,17 +253,6 @@ def main():
 
         if allInst.inst_counter == allInst.count:
             break
-            allInst
 
-"""
-    arg = []
-    arg.append('prvy')
-    arg.append('druhy')
-
-    allInst = InstArr()
-    allInst.addInst('STRI2INT', arg)
-    allInst.addInst('asd', arg)
-    allInst.show()
-"""
 if __name__ == "__main__":
     main()
