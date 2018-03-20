@@ -1,120 +1,29 @@
 import argparse
+import sys                  # Printing to STDERR
 from pprint import pprint
 import xml.etree.ElementTree as ET
 
-def iCreateFrame():
-    return ""
+"""""""""""""""""""""""""""""""""ERROR_CODES"""""""""""""""""""""""""""""""""""
+XML_ERR = 31
+SYN_ERR = 32
+ARG_ERR = 10
+IN_ERR = 11
+OUT_ERR = 12
+SEM_ERR = 52
+TYPE_ERR = 53
+VAR_ERR = 54
+FRAME_ERR = 55
+VOID_ERROR = 56
+ZERO_ERR = 57
+STR_ERR = 58
+OTHER_ERR = 99
 
-def iPushFrame():
-    return ""
+ARG_STR = "Invalid arguments"
 
-def iPopFrame():
-    return ""
-
-def iReturn():
-    return ""
-
-def iBreak():
-    return ""
-
-def iDefVar(inst):
-    name = inst['args'][0]['text']
-    frame = getFrame(name[:2])
-    name = name[3:]
-    frame.update({name: {'type': None, 'value': None}})
-
-def iCall():
-    return ""
-
-def iPushs():
-    return ""
-
-def iPops():
-    return ""
-
-def iWrite():
-    return ""
-
-def iLabel():
-    return ""
-
-def iLabel():
-    return ""
-
-def iJump():
-    return ""
-
-def iDPrint():
-    return ""
-
-def iMove(inst):
-    if inst['args'][1]['type'] != 'var':        # Constant
-        frame = getFrame(inst['args'][0]['text'][:2])
-        if inst['args'][0]['text'][3:] in frame:
-            frame.update({inst['args'][0]['text'][3:]: {'type': inst['args'][1]['type'], 'value': inst['args'][1]['text']}})
-        else:
-            exit(31)
-    pprint(frame)
-
-def iInt2char():
-    return ""
-
-def iRead():
-    return ""
-
-def iStrLen():
-    return ""
-
-def iType():
-    return ""
-
-def iAdd():
-    return ""
-
-def iSub():
-    return ""
-
-def iMul():
-    return ""
-
-def iIDiv():
-    return ""
-
-def iLt():
-    return ""
-
-def iGt():
-    return ""
-
-def iEq():
-    return ""
-
-def iAnd():
-    return ""
-
-def iOr():
-    return ""
-
-def iNot():
-    return ""
-
-def iStri2int():
-    return ""
-
-def iConcat():
-    return ""
-
-def iGetChar():
-    return ""
-
-def iSetChar():
-    return ""
-
-def iJumpIfEq():
-    return ""
-
-def iJumpIfNEq():
-    return ""
+def retError(err, msg):
+    sys.stderr.write("Error found in instruction number " + str(allInst.inst_counter) + ".\n")
+    sys.stderr.write(msg + ".\n")
+    exit(err)
 
 def getFrame(frame):
     if frame == 'GF':
@@ -124,46 +33,145 @@ def getFrame(frame):
     elif frame == 'TF':
         pass
 
-def mainSwitch(inst):
-    switcher = {
-        'CREATEFRAME': iCreateFrame,
-        'PUSHFRAME': iPushFrame,
-        'POPFRAME': iPopFrame,
-        'RETURN': iReturn,
-        'BREAK': iBreak,
-        'DEFVAR': iDefVar,
-        'CALL': iCall,
-        'PUSHS': iPushs,
-        'POPS': iPops,
-        'WRITE': iWrite,
-        'LABEL': iLabel,
-        'JUMP': iJump,
-        'DPRINT': iDPrint,
-        'MOVE': iMove,
-        'INT2CHAR': iInt2char,
-        'READ': iRead,
-        'STRLEN': iStrLen,
-        'TYPE': iType,
-        'ADD': iAdd,
-        'SUB': iSub,
-        'MUL': iMul,
-        'IDIV': iIDiv,
-        'LT': iLt,
-        'GT': iGt,
-        'EQ': iEq,
-        'AND': iAnd,
-        'OR': iOr,
-        'NOT': iNot,
-        'STRI2INT': iStri2int,
-        'CONCAT': iConcat,
-        'GETCHAR': iGetChar,
-        'SETCHAR': iSetChar,
-        'JUMPIFEQ': iJumpIfEq,
-        'JUMPIFNEQ': iJumpIfNEq,
-    }
+# Translate variable if variable, else return constant
+def varTranslate(var):
+    if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string':
+        return var
+    elif var['type'] == 'var':
+        frame = getFrame(var['text'][:2])
+        if var['text'][3:] in frame:
+            return frame[var['text'][3:]]
+        else:
+            retError(VAR_ERR, "Undefined variable")
+    else:
+        retError(SYN_ERR, "Unknown type of symbol")
 
-    func = switcher.get(inst, lambda: "Unknown")
-    func(allInst.getInst())
+"""""""""""""""""""""""""""""""""""""HELPING_FUNCTIONS"""""""""""""""""""""""""""""""""""""""""""
+
+def icreateframe():
+    return ""
+
+def ipushframe():
+    return ""
+
+def ipopframe():
+    return ""
+
+def ireturn():
+    return ""
+
+def ibreak():
+    return ""
+
+def idefvar(inst):
+    name = inst['args'][0]['text']
+    frame = getFrame(name[:2])
+    name = name[3:]
+    frame.update({name: {'type': None, 'value': None}})
+
+def icall():
+    return ""
+
+def ipushs():
+    return ""
+
+def ipops():
+    return ""
+
+def iwrite():
+    return ""
+
+def ilabel(inst):
+    return
+
+def ijump():
+    return ""
+
+def idprint():
+    return ""
+
+def imove(inst):
+    if inst['args'][1]['type'] != 'var':        # Constant
+        frame = getFrame(inst['args'][0]['text'][:2])
+        if inst['args'][0]['text'][3:] in frame:
+            frame.update({inst['args'][0]['text'][3:]: {'type': inst['args'][1]['type'], 'value': inst['args'][1]['text']}})
+        else:
+            exit(31)
+
+def iint2char():
+    return ""
+
+def iread():
+    return ""
+
+def istrlen():
+    return ""
+
+def itype():
+    return ""
+
+def iadd():
+    return ""
+
+def isub():
+    return ""
+
+def imul():
+    return ""
+
+def iidiv():
+    return ""
+
+def ilt():
+    return ""
+
+def igt():
+    return ""
+
+def ieq():
+    return ""
+
+def iand():
+    return ""
+
+def ior():
+    return ""
+
+def inot():
+    return ""
+
+def istri2int():
+    return ""
+
+def iconcat():
+    return ""
+
+def igetchar():
+    return ""
+
+def isetchar():
+    return ""
+
+def ijumpifeq(inst):
+    if len(inst['args']) != 3:
+        retError(SYN_ERR, ARG_STR)
+
+    var1 = varTranslate(inst['args'][1])
+    var2 = varTranslate(inst['args'][2])
+
+    if var1['type'] != var2['type']:
+        retError(TYPE_ERR, "Type incompatibility")
+
+    if inst['args'][0]['text'] in label_arr:
+        if var1 == var2:                                                # Jump
+            allInst.setCounter(label_arr[inst['args'][0]['text']])
+        else:                                                           # Nothing to do
+            pass
+    else:
+        retError(SEM_ERR, "Undefined label")
+
+def ijumpifneq():
+    return ""
 
 """ Class representing array of all instructions
 #   Include program counter
@@ -196,9 +204,6 @@ class InstArr:
     def stackAdd(self, number):
         self.count_stack.append(number)
 
-    #def doStuff(self):
-    #    mainSwitch(self.instructions[self.inst_counter])
-
     def show(self):
         pprint(self.instructions)
 
@@ -210,19 +215,24 @@ def createArr(arr, labels, path):
     for child in root:
         if child.tag == 'instruction':              # If instruction, add to array
             args = []
-            if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
-                arg = child.getchildren()
-                if arg[0].text in label_arr:
-                    exit(31)
-                label_arr.update({arg[0].text: child.attrib['order']})
-            else:
-                for arg in child:                   # Iterate in arguments
-                    arg = {
-                        'type': arg.attrib['type'],
-                        'text': arg.text
-                    }
-                    args.append(arg)
+
+            for arg in child:                   # Iterate in arguments
+                arg = {
+                    'type': arg.attrib['type'],
+                    'text': arg.text
+                }
+                args.append(arg)
             arr.addInst(child.attrib['opcode'], args)       # Add instruction with args to array of all instructions
+
+            if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
+                if args[0]['type'] != 'label' or len(args) != 1:
+                    retError(SYN_ERR, ARG_STR)
+
+                if args[0]['text'] in label_arr:  # Redefinition of label
+                    retError(SEM_ERR, "Redefinition of label.")
+
+                label_arr.update({args[0]['text']: child.attrib['order']})
+
         elif child.tag != 'name' and child.tag != 'description':  # Unknown element
             exit(31)
 
@@ -231,6 +241,7 @@ def createArr(arr, labels, path):
 label_arr = {}          # Array of all labels
 allInst = InstArr()
 global_frame = {}       # Array of variables in global frame
+frame_stack = {}        # Stack of frames
 
 
 def main():
@@ -247,12 +258,10 @@ def main():
     createArr(allInst, label_arr, path)
 
     # Iterate in all instructions
-    while True:
+    while allInst.inst_counter < allInst.count:
         allInst.incCounter()
-        mainSwitch(allInst.getInst()['opcode'])
+        globals()['i' + allInst.getInst()['opcode'].lower()](allInst.getInst())         # Call function assigned to opcode
 
-        if allInst.inst_counter == allInst.count:
-            break
 
 if __name__ == "__main__":
     main()
