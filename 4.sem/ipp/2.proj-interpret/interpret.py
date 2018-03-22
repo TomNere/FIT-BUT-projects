@@ -18,7 +18,7 @@ ZERO_ERR = 57
 STR_ERR = 58
 OTHER_ERR = 99
 
-ARG_STR = "Invalid arguments"
+ARG_STR = "Invalid argument(s)"
 
 def retError(err, msg):
     sys.stderr.write("Error found in instruction number " + str(allInst.inst_counter) + ".\n")
@@ -33,11 +33,14 @@ def getFrame(frame):
         pass
     elif frame == 'TF':
         pass
+    else:
+        False
 
 
 # Translate variable if variable, else return constant
 def varTranslate(var):
     if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string':
+        typeCheck(var)
         return var
     elif var['type'] == 'var':
         frame = getFrame(var['value'][:2])
@@ -48,10 +51,57 @@ def varTranslate(var):
     else:
         retError(SYN_ERR, "Unknown type of symbol")
 
+
 # Check number of arguments
 # TODO
 def argCheck(inst, number):
-    pass
+    if len(inst['args']) != number:
+        retError(ARG_ERR, ARG_STR)
+
+def assignValue(var, new_value):
+    frame = getFrame(var['value'][:2])
+    if var['value'][3:] in frame:
+        frame.update({var['value'][3:]: new_value})
+
+
+def typeCheck(var):
+    if var['type'] == 'int':
+        number = intCheck(var['value'])
+        if number is False:
+            retError(SEM_ERR, "Invalid integer value")
+        var.update({'value': number})
+
+    if var['type'] == 'bool':
+        if var['value'] == 'true':
+            var.update({'value': True})
+        elif var['value'] == 'false':
+            var.update({'value': False})
+        else:
+            retError(SEM_ERR, "Invalid bool value")
+
+    #TODO
+    if var['type'] == 'string':
+        pass
+    if var['type'] == 'label':
+        pass
+
+def tryInput():
+    try:
+        var = input()
+    except EOFError:
+        var = False
+    return var
+
+
+def intCheck(var):
+    if var[0] in ('-', '+'):
+        if var[1:].isdigit() is False:
+            return False
+    if var.isdigit() is False:
+        return False
+
+    return int(var, base=10)
+
 
 """""""""""""""""""""""""""""""""""""HELPING_FUNCTIONS"""""""""""""""""""""""""""""""""""""""""""
 
@@ -75,119 +125,256 @@ def ibreak():
     return ""
 
 def idefvar(inst):
+    argCheck(inst, 1)
     name = inst['args'][0]['value']
     frame = getFrame(name[:2])
     name = name[3:]
     frame.update({name: {'type': None, 'value': None}})
 
+
 def icall():
     return ""
 
+
 # Push value on the top of data stack
 def ipushs(inst):
-    if len(inst['args']) == 1:
-        var = varTranslate(inst['args'][0])
-        data_stack.append(var)
-    else:
-        retError(ARG_ERR, ARG_STR)
+    argCheck(inst, 1)
+    var = varTranslate(inst['args'][0])
+    data_stack.append(var)
 
 
 def ipops(inst):
-    if len(inst['args']) == 1:
-        frame = getFrame(inst['args'][0]['value'][:2])
-        name = inst['args'][0]['value'][3:]
+    argCheck(inst, 1)
+    frame = getFrame(inst['args'][0]['value'][:2])
+    name = inst['args'][0]['value'][3:]
 
-        if name in frame:                           # Defined
-            frame[name] = data_stack[-1]
-            del data_stack[-1]
-        else:
-            retError(VAR_ERR, "Undeclared Variable")
+    if name in frame:                           # Defined
+        assignValue(inst['args'][0])
+        frame[name] = data_stack[-1]
+        del data_stack[-1]
     else:
-        retError(ARG_ERR, ARG_STR)
+        retError(VAR_ERR, "Undeclared Variable")
 
 
 def iwrite(inst):
-    if len(inst['args']) == 1:
-        var = varTranslate(inst['args'][0])
-        print (var['value'])
+    argCheck(inst, 1)
+    var = varTranslate(inst['args'][0])
+    if var['type'] == 'int':                # Int to str
+        printed = str(var['value'])
+    elif var['type'] == 'bool':             # Bool values translate
+        if var['value'] is True:
+            printed = 'true'
+        else:
+            printed = 'false'
     else:
-        retError(SYN_ERR, ARG_STR)
+        printed = var['value']
+
+    if inst['opcode'] == 'WRITE':
+        print(printed)
+    else:
+        sys.stderr.write(printed)
 
 
 def ijump(inst):
-    if len(inst['args']) == 1:
-        if inst['args'][0]['value'] in label_arr:
-            allInst.setCounter(label_arr[inst['args'][0]['value']])
-        else:
-            retError(SEM_ERR, 'Undefined label')
+    argCheck(inst, 1)
+    if inst['args'][0]['value'] in label_arr:
+        allInst.setCounter(label_arr[inst['args'][0]['value']])
     else:
-        retError(SYN_ERR, ARG_STR)
+        retError(SEM_ERR, 'Undefined label')
 
-
-def idprint():
-    return ""
 
 def imove(inst):
-    if inst['args'][1]['type'] != 'var':        # Constant
-        frame = getFrame(inst['args'][0]['value'][:2])
-        if inst['args'][0]['value'][3:] in frame:
-            frame.update({inst['args'][0]['value'][3:]: {'type': inst['args'][1]['type'], 'value': inst['args'][1]['value']}})
+    var = varTranslate(inst['args'][1])
+    assignValue(inst['args'][0], var)
+
+
+def iint2char(inst):
+    argCheck(inst, 2)
+    var = varTranslate(inst['args'][1])
+    if var['type'] != 'int':
+        retError(SEM_ERR, 'Integer expected')
+
+    char = chr(var['value'])
+    if char is ValueError:                          # Unable to convert
+        retError(STR_ERR, "Invalid Unicode value")
+    assignValue(inst['args'][0], {'type': 'string', 'value': char})
+
+
+def iread(inst):
+    argCheck(inst, 2)
+    if inst['args'][1]['type'] != 'type':
+        retError(TYPE_ERR, 'Type expected')
+
+    var = tryInput()
+    if inst['args'][1]['value'] == 'bool':
+        if var == 'true':
+            var = True
         else:
-            retError(VAR_ERR, "Undefined variable")
+            var = False
+    elif inst['args'][1]['value'] == 'string':
+        if var is False:
+            var = ''
+    elif inst['args'][1]['value'] == 'int':
+        if var is False:
+            var = 0
+        else:
+            var = intCheck(var)
+            if var is False:
+                var = 0
+    else:
+        retError(SYN_ERR, 'Unknown type')
 
-def iint2char():
-    return ""
+    assignValue(inst['args'][0], {'type': inst['args'][1]['value'], 'value': var})
 
-def iread():
-    return ""
 
-def istrlen():
-    return ""
+def istrlen(inst):
+    argCheck(inst, 2)
+    string = varTranslate(inst['args'][1])
+    if string['type'] != 'string':
+        retError(TYPE_ERR, 'String expected')
+    length = len(string['value'])
+    assignValue(inst['args'][0], {'type': 'int', 'value': length})
 
-def itype():
-    return ""
 
-def iadd():
-    return ""
+def itype(inst):
+    argCheck(inst, 2)
+    frame = getFrame(inst['args'][1]['value'][:2])
+    if (frame is not False) and (inst['args'][1]['value'][3:] not in frame):
+        typee = ''
+    else:
+        var = varTranslate(inst['args'][1])
+        typee = var['type']
+    assignValue(inst['args'][1], {'type': 'string', 'value': typee})
 
-def isub():
-    return ""
 
-def imul():
-    return ""
+def iadd(inst):
+    argCheck(inst, 3)
+    op1 = varTranslate(inst['args'][1])
+    op2 = varTranslate(inst['args'][2])
+    number = 0
 
-def iidiv():
-    return ""
+    if op1['type'] == 'int' and op2['type'] == 'int':
+        if inst['opcode'] == 'ADD':
+            number = op1['value'] + op2['value']
+        elif inst['opcode'] == 'SUB':
+            number = op1['value'] - op2['value']
+        elif inst['opcode'] == 'MUL':
+            number = op1['value'] * op2['value']
+        elif inst['opcode'] == 'IDIV':
+            if op2['value'] != 0:
+                number = op1['value'] // op2['value']
+            else:
+                retError(ZERO_ERR, 'Division by Zero')
+        assignValue(inst['args'][0], {'type': 'int', 'value': number})
+    else:
+        retError(TYPE_ERR, 'Integers expected')
 
-def ilt():
-    return ""
 
-def igt():
-    return ""
+def ilt(inst):
+    argCheck(inst, 3)
+    op1 = varTranslate(inst['args'][1])
+    op2 = varTranslate(inst['args'][2])
+    flag = False
 
-def ieq():
-    return ""
+    if (op1['type'] == 'int' and op2['type'] == 'int') or (op1['type'] == 'string' and op2['type'] == 'string'):
+        if inst['opcode'] == 'LT':
+            flag =  op1['value'] < op2['value']
+        elif inst['opcode'] == 'GT':
+            flag = op1['value'] > op2['value']
+        elif inst['opcode'] == 'EQ':
+            flag = op1['value'] == op2['value']
 
-def iand():
-    return ""
+    elif op1['type'] == 'bool' and op2['type'] == 'bool':
+        if inst['opcode'] == 'LT':
+            flag = op1['value'] is False and op2['value'] is True
+        elif inst['opcode'] == 'GT':
+            flag = op1['value'] is True and op2['value'] is False
+        elif inst['opcode'] == 'EQ':
+            flag = op1['value'] is op2['value']
+    else:
+        retError(TYPE_ERR, 'Invalid type to compare')
 
-def ior():
-    return ""
+    assignValue(inst['args'][0], {'type': 'bool', 'value': flag})
 
-def inot():
-    return ""
 
-def istri2int():
-    return ""
+def iand(inst):
+    argCheck(inst, 3)
+    op1 = varTranslate(inst['args'][1])
+    op2 = varTranslate(inst['args'][2])
+    flag = False
 
-def iconcat():
-    return ""
+    if op1['type'] == 'bool' and op2['type'] == 'bool':
+        if inst['opcode'] == 'AND':
+            flag = op1['value'] and op2['value']
+        elif inst['opcode'] == 'OR':
+            flag = op2['value'] or op2['value']
+    else:
+        retError(TYPE_ERR, 'Bool operands expected')
 
-def igetchar():
-    return ""
+    assignValue(inst['args'][0], {'type': 'bool', 'value': flag})
 
-def isetchar():
-    return ""
+
+def inot(inst):
+    argCheck(inst, 2)
+    op1 = varTranslate(inst['args'][1])
+
+    if op1['type'] == 'bool':
+        assignValue(inst['args'][0], {'type': 'bool', 'value': not op1['value']})
+    else:
+        retError(TYPE_ERR, 'Bool operand expected')
+
+
+def istri2int(inst):
+    argCheck(inst, 3)
+    string = varTranslate(inst['args'][1])
+    pos = varTranslate(inst['args'][2])
+
+    if string['type'] == 'string' and pos['type'] == 'int':
+        if (pos['value'] < 0) or (pos['value'] > len(string['value']) - 1):         # Check for valid index
+            retError(STR_ERR, 'Index out of bounds')
+        var = False
+        if inst['opcode'] == 'STRI2INT':
+            var = ord(string['value'][pos['value']])
+        elif inst['opcode'] == 'GETCHAR':
+            var = string['value'][pos['value']]
+
+        assignValue(inst['args'][0], {'type': 'int', 'value': var})
+    else:
+        retError(TYPE_ERR, 'Invalid type of operand(s)')
+
+
+def iconcat(inst):
+    argCheck(inst, 3)
+    op1 = varTranslate(inst['args'][1])
+    op2 = varTranslate(inst['args'][2])
+
+    if op1['type'] == 'string' and op2['type'] == 'string':
+        string = op1['value'] + op2['value']
+        assignValue(inst['args'][0], {'type': 'string', 'value': string})
+    else:
+        retError(TYPE_ERR, 'String operands expected')
+
+
+def isetchar(inst):
+    argCheck(inst, 3)
+    pos = varTranslate(inst['args'][1])
+    char = varTranslate(inst['args'][2])
+    var = False
+
+    if inst['args'][0]['type'] == 'var':
+        var = varTranslate(inst['args'][0])
+    else:
+        retError(TYPE_ERR, 'Variable expected')
+
+    if var['type'] == 'string' and pos['type'] == 'int' and char['type'] == 'string':
+        if (pos['value'] < 0) or (pos['value'] > len(var['value']) - 1) or (len(char['value']) == 0):   # Check for valid index
+            retError(STR_ERR, 'Index out of bounds')
+
+        var['value'] = var['value'][:pos['value']] + char['value'][0] + var['value'][pos['value'] + 1:]
+        assignValue(inst['args'][0], var)
+    else:
+        retError(TYPE_ERR, 'Invalid type of argument(s)')
+
 
 def ijumpif(inst):
     if len(inst['args']) != 3:
@@ -226,25 +413,25 @@ def mainSwitch(inst):
         'WRITE': iwrite,
         'LABEL': inothing,
         'JUMP': ijump,
-        'DPRINT': idprint,
+        'DPRINT': iwrite,
         'MOVE': imove,
         'INT2CHAR': iint2char,
         'READ': iread,
         'STRLEN': istrlen,
         'TYPE': itype,
         'ADD': iadd,
-        'SUB': isub,
-        'MUL': imul,
-        'IDIV': iidiv,
+        'SUB': iadd,
+        'MUL': iadd,
+        'IDIV': iadd,
         'LT': ilt,
-        'GT': igt,
-        'EQ': ieq,
+        'GT': ilt,
+        'EQ': ilt,
         'AND': iand,
-        'OR': ior,
+        'OR': iand,
         'NOT': inot,
         'STRI2INT': istri2int,
         'CONCAT': iconcat,
-        'GETCHAR': igetchar,
+        'GETCHAR': istri2int,
         'SETCHAR': isetchar,
         'JUMPIFEQ': ijumpif,
         'JUMPIFNEQ': ijumpif,
