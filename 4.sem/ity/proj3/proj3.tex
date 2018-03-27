@@ -1,0 +1,104 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[IL2]{fontenc}
+\usepackage{times}
+\usepackage{multirow}
+\usepackage[left=2cm,text={17cm, 24cm},top=3cm]{geometry}
+
+\begin{document}
+	\begin{titlepage}
+		\begin{center}
+			
+			\textsc{\Huge Vysoké učení technické v~Brně\\[0.4em]}
+				\huge Fakulta informačních technologií\\
+			\vspace{\stretch{0.378}}
+			{\LARGE Typografie a~publikování\,--\,3. projekt\\[0.3em]}
+				\Huge Tabulky a~obrázky\\
+			\vspace{\stretch{0.622}}
+		\end{center}
+		{\Large\today \hfill Tomáš Nereča}
+	\end{titlepage}
+
+\section{Úvodní strana}
+Název práce umístěte do zlatého řezu a nezapomeňte uvést dnešní datum a vaše jméno a příjmení.
+
+\section{Tabulky}
+Pro sázení tabulek můžeme použít buď prostředí \texttt{tabbing} nebo prostředí \texttt{tabular}.
+
+\subsection{Prostředí \texttt{tabbing}}
+Při použití \texttt{tabbing} vypadá tabulka následovně:
+
+\begin{tabbing}
+	Vodní melouny \quad \= \textbf{Cena} \quad \= \textbf{Množství} \kill
+	\textbf{Ovoce} \> \textbf{Cena} \> \textbf{Množství}\\
+	Jablka \> 25,90 \> 3\ kg\\
+	Hrušky \> 27,40 \> 2,5\ kg\\
+	Vodní melouny \> 35,-- \> 1\ kus
+\end{tabbing}
+
+Toto prostředí se dá také použít pro sázení algoritmů, ovšem vhodnější je použít prostředí \texttt{algorithm} nebo
+\texttt{algorithm2e} (viz sekce 3).
+
+\subsection{Prostředí \texttt{tabular}}
+Další možností, jak vytvořit tabulku, je použít prostředí \texttt{tabular}. Tabulky pak budou vypadat takto\footnote{Kdyby byl problem s \texttt{cline}, zkuste se podívat třeba sem: http://www.abclinuxu.cz/tex/poradna/show/325037.}:
+
+\begin{table}[h]
+\begin{center}
+\catcode`\-=12 % http://www.abclinuxu.cz/tex/poradna/show/325037
+\begin{tabular}{|c|c|c|} \hline 
+	& \multicolumn{2}{|c|}{\textbf{Cena}}\\ \cline{2-3}
+	\textbf{Měna} & \textbf{Nákup} & \textbf{Prodej}\\ \hline
+EUR & 27,02 & 27,20 \\
+GBP & 31,08 & 31,80 \\
+USD & 25,15 & 25,51 \\ \hline
+\end{tabular}
+\caption{Tabulka kurzů k~dnešnímu dni}
+\label{kurzy}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\begin{center}
+\catcode`\-=12
+\begin{tabular}{|c|c|} \hline
+$A$ & $\neg A$ \\ \hline
+\textbf{P} & N \\ \hline
+\textbf{O} & O \\ \hline
+\textbf{X} & X \\ \hline
+\textbf{N} & P \\ \hline
+\end{tabular}
+\begin{tabular}{|c|c|c|c|c|c|} \hline
+			\multicolumn{2}{| c |}{\multirow{2}{*}{$A \wedge B$}} & \multicolumn{4}{| c |}{$B$}\\ \cline{3-6}
+			\multicolumn{2}{| c |}{} & \textbf{P} & \textbf{O} & \textbf{X} & \textbf{N}\\ \hline
+			\multirow{4}{*}{$A$} &\textbf{P} & P & O~& X & N\\ \cline{2-6}
+			&\textbf{O} & O~& O~& N & N\\ \cline{2-6}
+			&\textbf{X} & X & N & X & N\\ \cline{2-6}
+			&\textbf{N} & N & N & N & N\\ \hline
+		\end{tabular}
+		%%
+		\begin{tabular}{| c | c | c | c | c | c |} \hline
+			\multicolumn{2}{| c |}{\multirow{2}{*}{$A \vee B$}} & \multicolumn{4}{| c |}{$B$}\\ 
+			\cline{3-6}
+			\multicolumn{2}{| c |}{} & \textbf{P} & \textbf{O} & \textbf{X} & \textbf{N}\\ \hline
+			\multirow{4}{*}{$A$} &\textbf{P} & P & P & P & P\\ \cline{2-6}
+			&\textbf{O} & P & O~& P & O\\ \cline{2-6}
+			&\textbf{X} & P & P & X & X\\ \cline{2-6}
+			&\textbf{N} & P & O~& X & N\\ \hline
+		\end{tabular}
+		%%
+		\begin{tabular}{| c | c | c | c | c | c |} \hline
+			\multicolumn{2}{| c |}{\multirow{2}{*}{$A \rightarrow B$}} & \multicolumn{4}{| c |}{$B$}\\ \cline{3-6}
+			\multicolumn{2}{| c |}{} & \textbf{P} & \textbf{O} & \textbf{X} & \textbf{N}\\ \hline
+			\multirow{4}{*}{$A$} &\textbf{P} & P & O~& X & N\\ \cline{2-6}
+			&\textbf{O} & P & O~& P & O\\ \cline{2-6}
+			&\textbf{X} & P & P & X & X\\ \cline{2-6}
+			&\textbf{N} & P & P & P & P\\ \hline
+		\end{tabular}
+		
+		\caption{Protože Kleeneho trojhodnotová logika už je \uv{zastaralá}, 
+			uvádíme si zde příklad čtyřhodnotové logiky}
+		\label{logika}
+	\end{center}
+\end{table}
+\end{document}
