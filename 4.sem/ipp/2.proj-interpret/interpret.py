@@ -88,11 +88,13 @@ def typeCheck(var):
         else:
             retError(SEM_ERR, "Invalid bool value")
 
-    #TODO
     if var['type'] == 'string':
+        var.update({'value': strCheck(var['value'])})
+    elif var['type'] == 'label':
         pass
-    if var['type'] == 'label':
-        pass
+    else:
+        retError(SYN_ERR, 'Unknown variable type')
+
 
 def tryInput():
     try:
@@ -110,6 +112,26 @@ def intCheck(var):
         return False
 
     return int(var, base=10)
+
+
+def strCheck(var):
+    new_string = ""
+    counter = 0
+    while counter < len(var):
+        if var[counter] == '\\':
+            number = var[counter + 1:counter + 4]
+            print(number)
+            if number.isdigit():
+                new_string += chr(int(number, base=10))
+                counter += 3
+            else:
+                retError(SEM_ERR, 'Bad escape sequence in string')
+        elif var[counter].isspace():
+            retError(SEM_ERR, 'Unknown character in string')
+        else:
+            new_string += var[counter]
+        counter += 1
+    return new_string
 
 
 """""""""""""""""""""""""""""""""""""INSTRUCTIONS"""""""""""""""""""""""""""""""""""""""""""
