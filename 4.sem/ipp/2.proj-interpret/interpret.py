@@ -20,21 +20,30 @@ OTHER_ERR = 99
 
 ARG_STR = "Invalid argument(s)"
 
+"""""""""""""""""""""""""""""""""""""HELPING_FUNCTIONS"""""""""""""""""""""""""""""""""""""""""""
+
+
 def retError(err, msg):
     sys.stderr.write("Error found in instruction number " + str(allInst.inst_counter) + ".\n")
     sys.stderr.write(msg + ".\n")
     exit(err)
 
+
 def getFrame(frame):
-    global global_frame
+    global global_frame, tmp_frame, frame_stack
+
     if frame == 'GF':
         return global_frame
     elif frame == 'LF':
-        pass
+        if not frame_stack:
+            retError(FRAME_ERR, 'Undefined local frame')
+        return frame_stack[-1]
     elif frame == 'TF':
-        pass
+        if tmp_frame['undefined'] is True:
+            retError(FRAME_ERR, 'Undefined temporary frame')
+        return tmp_frame
     else:
-        False
+        retError(SYN_ERR, 'Invalid variable name')
 
 
 # Translate variable if variable, else return constant
@@ -53,10 +62,10 @@ def varTranslate(var):
 
 
 # Check number of arguments
-# TODO
 def argCheck(inst, number):
     if len(inst['args']) != number:
         retError(ARG_ERR, ARG_STR)
+
 
 def assignValue(var, new_value):
     frame = getFrame(var['value'][:2])
@@ -103,26 +112,53 @@ def intCheck(var):
     return int(var, base=10)
 
 
-"""""""""""""""""""""""""""""""""""""HELPING_FUNCTIONS"""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""INSTRUCTIONS"""""""""""""""""""""""""""""""""""""""""""
 
 # Nothing to do
 def inothing(inst):
     pass
 
-def icreateframe():
-    return ""
 
-def ipushframe():
-    return ""
+def iframes(inst):
+    argCheck(inst, 0)
+    global tmp_frame
+    if inst['opcode'] == 'CREATEFRAME':
+        tmp_frame.clear()
 
-def ipopframe():
-    return ""
+    elif inst['opcode'] == 'PUSHFRAME':
+        if tmp_frame['undefined'] is True:  # TF doesn't exist
+            retError(FRAME_ERR, 'Undefined temporary frame')
+        global frame_stack
+        frame_stack.append(tmp_frame)
+        tmp_frame.clear()
+        tmp_frame['undefined': True]
 
-def ireturn():
-    return ""
+    elif inst['opcode'] == 'POPFRAME':
+        if not frame_stack:                 # Empty stack of frames
+            retError(FRAME_ERR, 'Stack of frames is empty')
+        if tmp_frame['undefined'] is True:  # TF doesn't exist
+            retError(FRAME_ERR, 'Undefined temporary frame')
+        tmp_frame = frame_stack[-1]
+        del frame_stack[-1]
 
-def ibreak():
-    return ""
+
+def ireturn(inst):
+    argCheck(inst, 0)
+    global call_stack
+    if not call_stack:      # Empty stack of calls
+        retError(VOID_ERROR, 'Empty call stack')
+
+    allInst.setCounter(call_stack[-1])
+    del call_stack[-1]
+
+
+def ibreak(inst):
+    argCheck(inst, 0)
+    global global_frame, tmp_frame, frame_stack
+    sys.stderr.write('Global frame: ' + global_frame + "\n" +
+                     'Local frame: ' + frame_stack[-1] + "\n" +
+                     'Tmp frame: ' + tmp_frame)
+
 
 def idefvar(inst):
     argCheck(inst, 1)
@@ -132,14 +168,25 @@ def idefvar(inst):
     frame.update({name: {'type': None, 'value': None}})
 
 
-def icall():
-    return ""
+def icall(inst):
+    argCheck(inst, 1)
+    global call_stack, allInst
+    call_stack.append(allInst.inst_counter + 1)
+
+    if inst['args'][0]['type'] == 'label':
+        if inst['args'][0]['value'] in label_arr:
+            allInst.setCounter(label_arr[inst['args'][0]['value']])
+        else:
+            retError(SEM_ERR, 'Undefined label')
+    else:
+        retError(TYPE_ERR, 'Label expected.')
 
 
 # Push value on the top of data stack
 def ipushs(inst):
     argCheck(inst, 1)
     var = varTranslate(inst['args'][0])
+    global data_stack
     data_stack.append(var)
 
 
@@ -149,6 +196,7 @@ def ipops(inst):
     name = inst['args'][0]['value'][3:]
 
     if name in frame:                           # Defined
+        global data_stack
         assignValue(inst['args'][0])
         frame[name] = data_stack[-1]
         del data_stack[-1]
@@ -177,6 +225,7 @@ def iwrite(inst):
 
 def ijump(inst):
     argCheck(inst, 1)
+    global label_arr, allInst
     if inst['args'][0]['value'] in label_arr:
         allInst.setCounter(label_arr[inst['args'][0]['value']])
     else:
@@ -247,7 +296,7 @@ def itype(inst):
     assignValue(inst['args'][1], {'type': 'string', 'value': typee})
 
 
-def iadd(inst):
+def ievaluation(inst):
     argCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
@@ -270,7 +319,7 @@ def iadd(inst):
         retError(TYPE_ERR, 'Integers expected')
 
 
-def ilt(inst):
+def icomparison(inst):
     argCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
@@ -297,7 +346,7 @@ def ilt(inst):
     assignValue(inst['args'][0], {'type': 'bool', 'value': flag})
 
 
-def iand(inst):
+def ilogic(inst):
     argCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
@@ -367,7 +416,8 @@ def isetchar(inst):
         retError(TYPE_ERR, 'Variable expected')
 
     if var['type'] == 'string' and pos['type'] == 'int' and char['type'] == 'string':
-        if (pos['value'] < 0) or (pos['value'] > len(var['value']) - 1) or (len(char['value']) == 0):   # Check for valid index
+        # Check for valid index
+        if (pos['value'] < 0) or (pos['value'] > len(var['value']) - 1) or (len(char['value']) == 0):
             retError(STR_ERR, 'Index out of bounds')
 
         var['value'] = var['value'][:pos['value']] + char['value'][0] + var['value'][pos['value'] + 1:]
@@ -377,6 +427,7 @@ def isetchar(inst):
 
 
 def ijumpif(inst):
+    argCheck(inst, 3)
     if len(inst['args']) != 3:
         retError(SYN_ERR, ARG_STR)
 
@@ -401,9 +452,9 @@ def ijumpif(inst):
 
 def mainSwitch(inst):
     switcher = {
-        'CREATEFRAME': icreateframe,
-        'PUSHFRAME': ipushframe,
-        'POPFRAME': ipopframe,
+        'CREATEFRAME': iframes,
+        'PUSHFRAME': iframes,
+        'POPFRAME': iframes,
         'RETURN': ireturn,
         'BREAK': ibreak,
         'DEFVAR': idefvar,
@@ -419,15 +470,15 @@ def mainSwitch(inst):
         'READ': iread,
         'STRLEN': istrlen,
         'TYPE': itype,
-        'ADD': iadd,
-        'SUB': iadd,
-        'MUL': iadd,
-        'IDIV': iadd,
-        'LT': ilt,
-        'GT': ilt,
-        'EQ': ilt,
-        'AND': iand,
-        'OR': iand,
+        'ADD': ievaluation,
+        'SUB': ievaluation,
+        'MUL': ievaluation,
+        'IDIV': ievaluation,
+        'LT': icomparison,
+        'GT': icomparison,
+        'EQ': icomparison,
+        'AND': ilogic,
+        'OR': ilogic,
         'NOT': inot,
         'STRI2INT': istri2int,
         'CONCAT': iconcat,
@@ -439,6 +490,7 @@ def mainSwitch(inst):
 
     func = switcher.get(inst, lambda: "Unknown")
     func(allInst.getInst())
+
 
 """ Class representing array of all instructions
 #   Include program counter
@@ -503,7 +555,7 @@ def createArr(path):
                 label_arr.update({args[0]['value']: child.attrib['order']})
 
         elif child.tag != 'name' and child.tag != 'description':  # Unknown element
-            exit(31)
+            retError(XML_ERR, "Unknown element.")
 
 
 """""""""""""""""""""""""""""""""""""""""""""""Global variables"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -512,6 +564,9 @@ allInst = InstArr()
 global_frame = {}       # Array of variables in global frame
 frame_stack = []        # Stack of frames
 data_stack = []         # Stack of variables
+call_stack = []         # Stack of call
+tmp_frame = {'undefined': True}
+
 
 
 def main():
