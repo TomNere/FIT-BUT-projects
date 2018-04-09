@@ -6,13 +6,11 @@
 #include <netdb.h>      // gethostbyname...
 #include <pthread.h>
 #include <cstdlib>
-#include <sstream>
 #include <iomanip>
 #include <sys/time.h>
 #include <algorithm>
 #include <numeric>
-#include <math.h>
-#include <array>
+#include <cmath>
 
 using namespace std;
 
@@ -21,6 +19,8 @@ struct connection {
     struct sockaddr_in server_address;
     string sond;
     struct timeval time_stamp;
+    struct timeval rtt_stamp;
+    double rtt_time;
     int timeout;
     bool active;
 };
@@ -40,69 +40,87 @@ const string help = "Invalid parameters!\n"
                     "Usage: ./ipk-mtrip reflect -p port \n"
                     "         ./ipk-mtrip meter -h host -p port - s sond_size -t measurement time\n"
                     "\nsond_size(64-64000) is size in bytes of probe packet. 1500B is maximal safe size for UDP."
-                    "Aproximate speed for first run could take longer time with poor network connection and bigger sond_size.\n";
+                    "Estimate speed for first run could take longer time with poor network connection and bigger sond_size.\n";
 
-void * sending(void *num) {
-    long number = (long)num;
+// Interval between 2 time stamps in microseconds
+long timeInterval(struct timeval old_time, struct timeval new_time) {
+    long gap = 0;
+    if (new_time.tv_usec < old_time.tv_usec){
+        gap += (new_time.tv_usec + (1000000 - old_time.tv_usec));
+        if (new_time.tv_sec - old_time.tv_sec > 1) {
+            gap += ((new_time.tv_sec - old_time.tv_sec) - 1) * 1000000;
+        }
+    }
+    else {
+        gap += (new_time.tv_sec - old_time.tv_sec) * 1000000;
+        gap += (new_time.tv_usec - old_time.tv_usec);
+    }
+    return gap;
+}
+
+// Standart deviation
+double stdev(double arr[], int arr_size, double avg_speed) {
+    double count = 0;
+    for (int i = 0; i < arr_size; i++) {
+        count += ((arr[i] - avg_speed) * (arr[i] - avg_speed));
+    }
+    count = count / (arr_size - 1);         // N - 1
+    return sqrt(count);
+}
+
+// Thread for sending packets
+void* sending(void* par) {
+    long number = (long)par;
     socklen_t serverlen = sizeof(conn.server_address);
-    int buff_length = conn.sond.length();   // 16 - number
+    int buff_length = conn.sond.length();   // Stable size of packet
 
-    struct timeval act_time;
-    string stable_num;
+    conn.sond[0] = 'R';                     // Packet for RTT
+    gettimeofday(&conn.rtt_stamp, NULL);
+    int bytestx = sendto(conn.client_socket, conn.sond.c_str(), buff_length, 0, (struct sockaddr *) &conn.server_address, serverlen);
+    if (bytestx < 0) {
+        cerr << "Sendto error!" << endl;
+        return (void*)-1;
+    }
+    conn.sond[0] = 'a';
+
     for (long i = 0; ; i++) {
-        //cout << "Chcem poslat" << endl;
-        if (conn.active == false) {
-            //cout << "timeout_sec" << conn.time_stamp.tv_sec <<endl;
-            //cout << "timeout_usec" << conn.time_stamp.tv_usec <<endl;
-          //  cout << "Koniec send";1
-            //cout << "send false" << endl;
-            return (void*)(i);
+        if (conn.active == false) {         // Send packets until false
+            return (void*)(i + 1);          // + 1 - packet for RTT
         }
     
-        usleep(number);
+        usleep(number);                     // If too many packets are getting lost - usleep
 
         int bytestx = sendto(conn.client_socket, conn.sond.c_str(), buff_length, 0, (struct sockaddr *) &conn.server_address, serverlen);
         if (bytestx < 0) {
-            cerr << "Sendto error!";
+            cerr << "Sendto error!" << endl;
             break;
         }
-        //cout << "sent" << i << endl;
     }
-    return (void*)1;
+    return (void*)-1;
 }
 
-void * receiving(void *num) {
-    long number = (long)num;
+// Thread for receiving packets
+void* receiving(void* par) {
     socklen_t serverlen = sizeof(conn.server_address);
     struct timeval act_time;
 
-    struct timeval thrash_timeout;
-    thrash_timeout.tv_sec = 0;
-    thrash_timeout.tv_usec = 20000;     // 20 ms
-
-    struct timeval global_timeout;
-    global_timeout.tv_sec = 5;
-    global_timeout.tv_usec = 0;
+    // Try to get RTT packet
+    char buff[ACK_SIZE];
+    int bytesrx = recvfrom(conn.client_socket, buff, ACK_SIZE, 0, (struct sockaddr *) &conn.server_address, &serverlen);
+    if (bytesrx < 0) {
+        cerr << "Recvfrom error!" << endl;
+        return (void*)-1;
+    }
+    gettimeofday(&act_time, NULL);
+    if (buff[0] == 'R') {                    // If valid RTT packet, get RTT
+        conn.rtt_time = timeInterval(conn.rtt_stamp, act_time);
+    }
 
     for (long i = 0; ; i++) {
         gettimeofday(&act_time, NULL);
-        int gap = 0;
-        if (act_time.tv_usec < conn.time_stamp.tv_usec){
-            gap += (act_time.tv_usec + (1000000 - conn.time_stamp.tv_usec));
-            if (act_time.tv_sec - conn.time_stamp.tv_sec > 1) {
-                gap += ((act_time.tv_sec - conn.time_stamp.tv_sec) - 1) * 1000000;
-            }
-        }
-        else {
-            gap += (act_time.tv_sec - conn.time_stamp.tv_sec) * 1000000;
-            gap += (act_time.tv_usec - conn.time_stamp.tv_usec);
+        if (timeInterval(conn.time_stamp, act_time) >= conn.timeout) {
+            conn.active = false;            // Stop sending after timeout
 
-        }
-
-        if (gap >= conn.timeout) {
-            conn.active = false;
-            //cout << "timeout_sec" << act_time.tv_sec <<endl;
-            //cout << "timeout_usec" << act_time.tv_usec <<endl;
             int rest = 0;
             while(true) {
                 char buff[ACK_SIZE];
@@ -112,30 +130,17 @@ void * receiving(void *num) {
                 }
                 rest++;
             }
-            return (void*)(i + rest);
+            return (void*)(i + 1 + rest);   // + 1 - packet for RTT
         }
         
         char buff[NUMBER_SIZE];
         int bytesrx = recvfrom(conn.client_socket, buff, ACK_SIZE, 0, (struct sockaddr *) &conn.server_address, &serverlen);
-        //cout << buff << endl;
-
         if (bytesrx < 0){
-            cerr << "Recvfrom error!";
-            return (void*)i;
+            cerr << "Recvfrom error!" << endl;
+            return (void*)-1;
         }
     }
-    return (void*)1;
-
-}
-
-double stdev(double arr[], int arr_size, double avg_speed) {
-    double count = 0;
-    for (int i = 0; i < arr_size; i++) {
-        count += ((arr[i] - avg_speed) * (arr[i] - avg_speed));
-    }
-    count = count / (arr_size - 1);         // N - 1
-    count = sqrt(count);
-    return count;
+    return (void*)-1;
 }
 
 void meter(int argc, char const *argv[]) {
@@ -234,14 +239,13 @@ void meter(int argc, char const *argv[]) {
 
     /****************************************PREPARE FOR MEASUREMENT*****************************************/
 
-    // Global timeout for socket(recv_from)
+    // Global timeout for socket(recv_from) - depend on size of sond
     struct timeval socket_timeout;
-
     if (byte_number >= 1000) {
         socket_timeout.tv_sec = 1;     // 1 sec
-        socket_timeout.tv_usec = 500 * 1000;   // Miliseconds
+        socket_timeout.tv_usec = 500 * 1000;   // * 1000 - miliseconds
     }
-    else if (byte_number >= 500){
+    else if (byte_number >= 500) {
         socket_timeout.tv_sec = 0;
         socket_timeout.tv_usec = byte_number * 1000;
     }
@@ -251,45 +255,41 @@ void meter(int argc, char const *argv[]) {
     }
     
     setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout, sizeof socket_timeout);
-    conn.timeout = socket_timeout.tv_sec * 1000000 + socket_timeout.tv_usec;                  // 50ms
+    conn.timeout = socket_timeout.tv_sec * 1000000 + socket_timeout.tv_usec;    // Timeout in microseconds
 
     // Initialization of struct conn
     conn.client_socket = client_socket;
     conn.server_address = server_address;
     conn.sond = sond;
 
-    long number = 0;    // Number of microsecond to usleep
     pthread_t thread1, thread2;
-    long estimation = 0;
-    void* send_ret = 0;
-    void* recv_ret = 0;
+    long number = 0;            // Number of microsecond to usleep
+    long estimation = 0;        // Usleep value
+    void* send_ret = 0;         // Return value of sending
+    void* recv_ret = 0;         // Return value of receiving
 
     // First estimate of bandwidth
     cout << "\nGetting ready.";
-    cout.flush();
+    cout.flush();               // To print immediately
 
-    struct timeval est_time;
+    struct timeval est_time;        // Ensure that speed estimation won't take longer than 30s
     gettimeofday(&est_time, NULL);
     
     struct timeval act_time;
     for (int i = 0; ; i++) {
         gettimeofday(&conn.time_stamp, NULL);
-
         conn.active = true;
         pthread_create(&thread1, NULL, sending, (void *)number);
         pthread_create(&thread2, NULL, receiving, (void *)number);
-        pthread_join(thread2, &recv_ret);
         pthread_join(thread1, &send_ret);
-        //cout << "sent " << (long)send_ret << endl;
-        //cout << "recv " << (long)recv_ret << endl;
+        pthread_join(thread2, &recv_ret);
 
         gettimeofday(&act_time, NULL);
         if ((act_time.tv_sec - est_time.tv_sec) >= 30) {
             ERR_RET("\nUnable to estimate! Too poor bandwidth for this packet size.");
         }
-
         if (((long)send_ret - (long)recv_ret) > ((long)send_ret / 100)) {
-            number += 50;                 // bigger usleep
+            number += 50;                 // If lost packet is over 1% , try bigger usleep
             cout << ".";
             cout.flush();
         }
@@ -300,75 +300,92 @@ void meter(int argc, char const *argv[]) {
         } 
     }
 
-    //cout << "\nEstimation usleep: " << estimation << endl;
+    int arr_size;           // Size of array where measurement values will be stored
 
-    double run_speed;
-    int arr_size;
-
-    int loop_limit = 0;
+    int loop_limit = 0;     // Number of runs and interval of one run depend on time parameter
     if (time <= 5) {
-        cout << "Warning: Measurement could be innaccurate due to time!" << endl;
-        cout << "Time interval for one run: " << "0.5s" << endl;
-        socket_timeout.tv_sec = 0;     // 1 sec
-        socket_timeout.tv_usec = 500 * 1000;   // Miliseconds
+        cout << "Starting - time interval for one run:  " << "0.5s" << endl;
+        socket_timeout.tv_sec = 0;             
+        socket_timeout.tv_usec = 500 * 1000;   
         conn.timeout = 500000;
         arr_size = loop_limit = time * 2;
     }
     else if (time <= 8) {
-        cout << "Time interval for one run: " << "1s" << endl;
-        socket_timeout.tv_sec = 1;     // 1 sec
-        socket_timeout.tv_usec = 0;   // Miliseconds
+        cout << "\nStarting - time interval for one run:  " << "1s" << endl;
+        socket_timeout.tv_sec = 1;     
+        socket_timeout.tv_usec = 0;   
         conn.timeout = 1000000;
         arr_size =loop_limit = time;
     }
     else {
-        cout << "Time interval for one run: " << "2s" << endl;
+        cout << "\nStarting - time interval for one run:  " << "2s" << endl;
         conn.timeout = 2000000;
         loop_limit = time / 2;
         arr_size = loop_limit + (time % 2);
     }
+    // Also timeout for socket(recvfrom) is set
     setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout, sizeof socket_timeout);
-    double measurements[arr_size];
 
-    cout << "\nStarting..." << endl << endl;
+    double measurements[arr_size];      // Array of measurement values
+    double avg_rtt = 0.0;               // Variable for RTT
+    int succ_rtt = 0;                   // Number of successful RTT measurements
 
     gettimeofday(&est_time, NULL);
     for (int i = 0; i < loop_limit; i++) {
         gettimeofday(&conn.time_stamp, NULL);
-        //cout << "act_sec" << conn.time_stamp.tv_sec <<endl;
-        //cout << "act_usec" << conn.time_stamp.tv_usec <<endl;
 
         conn.active = true;
+        conn.rtt_time = -1;             // Reset RTT
+
         pthread_create(&thread1, NULL, sending, (void *)estimation);
         pthread_create(&thread2, NULL, receiving, (void *)estimation);
-        pthread_join(thread2, &recv_ret);
         pthread_join(thread1, &send_ret);
-        //cout << "recv" << (long)recv_ret << endl;
+        pthread_join(thread2, &recv_ret);
 
-        if (((long)send_ret - (long)recv_ret) > ((long)send_ret / 100)) {
-            //cout << "crash" << endl;
-            estimation += 50;                 // bigger usleep
+        if ((long)send_ret == -1 || (long)recv_ret == -1) { // Something went wrong
+            recv_ret = 0;                                   // This measurement will be 0 Mbit/s
+        }
+        else if (((long)send_ret - (long)recv_ret) > ((long)send_ret / 100)) {
+            estimation += 50;               // If lost packet is over 1% , try bigger usleep
         }
         else {
-            if (estimation >= 50) {
+            if (estimation >= 50) {         // Else , try smaller usleep if possible
                 estimation -= 50;
             }
         }
 
-        measurements[i] = (long)recv_ret * byte_number * 8 *(10.0/(conn.timeout / 100000.0)) / b_to_Mb;
-        cout << "Run " << i + 1 << "\tpackets: (" << (long)send_ret << "/" << (long)recv_ret << ")" << endl;
-        cout << "      \tspeed: " << measurements[i] << " Mbit/s" << endl << endl;
+        if (conn.rtt_time != -1) {              // Successful RTT measurement
+            avg_rtt += (conn.rtt_time / 1000);  // Store RTT in miliseconds
+            succ_rtt++;
+        }
+
+        // Bandwidth in Mbit/s
+        measurements[i] = (long)recv_ret * byte_number * 8 * (10.0/(conn.timeout / 100000.0)) / b_to_Mb;
+
+        // Print info
+        cout << "\tRun " << i + 1 << "\tpackets: (" << (long)send_ret << "/" << (long)recv_ret << ")"
+             << "\t\tspeed: " << measurements[i] << " Mbit/s" << endl;
+
+        // If interval of run is 2, still is time for measurement
         if ((time > 6) && (time % 2 == 1) && (i == loop_limit - 1)) {
             conn.timeout = 1000000;
             loop_limit++;
         }
     }
 
-    cout << "Minimal speed: " << setprecision(5) << *min_element(measurements, measurements + loop_limit) << " Mbit/s" << endl
+    // Print final info
+    cout << "\n\nMinimal speed: " << *min_element(measurements, measurements + loop_limit) << " Mbit/s" << endl
          << "Maximal speed: " << *max_element(measurements, measurements + loop_limit) << " Mbit/s" << endl;
     double avg_speed = accumulate(measurements, measurements + loop_limit, 0.0) / loop_limit;
-    cout << "Average speed: " << setprecision(5) << avg_speed << " Mbit/s" << endl
+    cout << "Average speed: " << avg_speed << " Mbit/s" << endl
          << "STDEV:         " << stdev(measurements, loop_limit, avg_speed) << " Mbit/s" << endl;
+
+    if (succ_rtt == 0) {
+        cout << "RTT:           RTT couldn't be measured!" << endl;
+    }
+    else {
+        cout << "RTT:           " << avg_rtt / succ_rtt << " ms" << endl;
+    }
 }
 
 void reflect(int argc, char const *argv[]) {
@@ -438,7 +455,7 @@ void reflect(int argc, char const *argv[]) {
         }
 
         // Send only ACK packet
-        int bytestx = sendto(server_socket, "!", ACK_SIZE, 0, (struct sockaddr *) &client_address, clientlen);
+        int bytestx = sendto(server_socket, buff, ACK_SIZE, 0, (struct sockaddr *) &client_address, clientlen);
         if (bytestx < 0)  
             cerr << "Sendto error!"; 
     }
