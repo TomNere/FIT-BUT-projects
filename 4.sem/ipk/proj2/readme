@@ -1,0 +1,18 @@
+Aplikácia pre meranie prenosovej rýchlosti.
+
+
+Základné informácie:
+
+	- Makefile má cieľ all pre aplikáciu ipk-mtrip a cieľ clean pre zmazanie binárneho súboru
+	- po spustení niektorej aplikácie bez vstupných argumentov sa zobrazí nápoveda
+	- typické spustenie aplikácie reflect: ./ipk-mtrip reflect -p 30100
+	- typické spustenie aplikácie meter  : ./ipk-mtrip -h merlin.fit.vutbr.cz -p 30100 -s 1000 -t 10
+	- veľkosť sondy musí byť v rozsahu 64-64000 a čas aspoň 3 sekundy
+	- meter po spustení vykoná odhad rýchlosti, následne bude merať rýchlosť na základe parametru -t, 
+		a po výpise informácí na stdout skončí
+	- prenosová rýchlosť je udávaná vždy v megabitoch za sekundu, RTT je udávané v milisekundách
+	- reflektor vybavuje requesty až do zaslania signálu SIGINT, teda zadaním ctrl+c z klávesnice
+
+Obmedzenia:
+	- ak je prenosová rýchlosť nízka a nadmerná veľkosť sondy, odhad rýchlosti môže trvať dlhší čas, 
+		prípadne môže aplikácia skončiť s neúspechom

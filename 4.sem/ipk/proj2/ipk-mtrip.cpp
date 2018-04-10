@@ -1,9 +1,9 @@
-#include <iostream>     // I/O operations
+#include <iostream>
 #include <string.h>
-#include <unistd.h>     // getopt etc.
-#include <sys/socket.h> // Sockets...
-#include <netinet/in.h> // sockaddr_in...
-#include <netdb.h>      // gethostbyname...
+#include <unistd.h>     
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <netdb.h>      
 #include <pthread.h>
 #include <cstdlib>
 #include <iomanip>
@@ -14,6 +14,7 @@
 
 using namespace std;
 
+// Main struct representing connection
 struct connection {
     int client_socket;
     struct sockaddr_in server_address;
@@ -24,7 +25,6 @@ struct connection {
     int timeout;
     bool active;
 };
-
 struct connection conn;
 
 #define ERR_RET(message) cerr << message << endl; exit(EXIT_FAILURE);
@@ -36,10 +36,11 @@ struct connection conn;
 #define PORT_RANGE 65535
 #define b_to_Mb 1048576
 
-const string help = "Invalid parameters!\n"
+const string help = "Invalid parameters!\n\n"
                     "Usage: ./ipk-mtrip reflect -p port \n"
-                    "         ./ipk-mtrip meter -h host -p port - s sond_size -t measurement time\n"
-                    "\nsond_size(64-64000) is size in bytes of probe packet. 1500B is maximal safe size for UDP."
+                    "         ./ipk-mtrip meter -h host -p port - s sond_size -t measurement_time\n"
+                    "\nsond_size(64-64000) is size in bytes of sond - probe packet.\n"
+                    "measurement_time is time in second(must be >=3).\n"
                     "Estimate speed for first run could take longer time with poor network connection and bigger sond_size.\n";
 
 // Interval between 2 time stamps in microseconds
@@ -58,7 +59,7 @@ long timeInterval(struct timeval old_time, struct timeval new_time) {
     return gap;
 }
 
-// Standart deviation
+// StandardPo deviation
 double stdev(double arr[], int arr_size, double avg_speed) {
     double count = 0;
     for (int i = 0; i < arr_size; i++) {
@@ -78,8 +79,7 @@ void* sending(void* par) {
     gettimeofday(&conn.rtt_stamp, NULL);
     int bytestx = sendto(conn.client_socket, conn.sond.c_str(), buff_length, 0, (struct sockaddr *) &conn.server_address, serverlen);
     if (bytestx < 0) {
-        cerr << "Sendto error!" << endl;
-        return (void*)-1;
+        ERR_RET("Sendto error!");
     }
     conn.sond[0] = 'a';
 
@@ -92,8 +92,7 @@ void* sending(void* par) {
 
         int bytestx = sendto(conn.client_socket, conn.sond.c_str(), buff_length, 0, (struct sockaddr *) &conn.server_address, serverlen);
         if (bytestx < 0) {
-            cerr << "Sendto error!" << endl;
-            break;
+            ERR_RET("Sendto error!");
         }
     }
     return (void*)-1;
@@ -109,7 +108,7 @@ void* receiving(void* par) {
     int bytesrx = recvfrom(conn.client_socket, buff, ACK_SIZE, 0, (struct sockaddr *) &conn.server_address, &serverlen);
     if (bytesrx < 0) {
         cerr << "Recvfrom error!" << endl;
-        return (void*)-1;
+        ERR_RET("Too poor bandwidth for this packet size.");
     }
     gettimeofday(&act_time, NULL);
     if (buff[0] == 'R') {                    // If valid RTT packet, get RTT
@@ -137,12 +136,13 @@ void* receiving(void* par) {
         int bytesrx = recvfrom(conn.client_socket, buff, ACK_SIZE, 0, (struct sockaddr *) &conn.server_address, &serverlen);
         if (bytesrx < 0){
             cerr << "Recvfrom error!" << endl;
-            return (void*)-1;
+            ERR_RET("Too poor bandwidth for this packet size.");
         }
     }
     return (void*)-1;
 }
 
+// Meter application
 void meter(int argc, char const *argv[]) {
     if (argc != 10) {
         ERR_RET(help);
@@ -214,7 +214,7 @@ void meter(int argc, char const *argv[]) {
     if (par_sond.find_first_not_of("0123456789") == string::npos) {     // Check for valid sond 
         byte_number = stoi(par_sond, NULL, 10);
         if (byte_number > MAX_BUFF_SIZE || byte_number < MIN_BUFF_SIZE) {
-            ERR_RET("Sond of this size couldn't be sent!(Range is 64-1500).");
+            ERR_RET("Sond of this size couldn't be sent!(Range is 64-64000).");
         }
         sond = "";
         for (int i = 0; i < byte_number; i++) {          // Generate sond
@@ -303,14 +303,14 @@ void meter(int argc, char const *argv[]) {
     int arr_size;           // Size of array where measurement values will be stored
 
     int loop_limit = 0;     // Number of runs and interval of one run depend on time parameter
-    if (time <= 5) {
+    if (time <= 4) {
         cout << "Starting - time interval for one run:  " << "0.5s" << endl;
         socket_timeout.tv_sec = 0;             
         socket_timeout.tv_usec = 500 * 1000;   
         conn.timeout = 500000;
         arr_size = loop_limit = time * 2;
     }
-    else if (time <= 8) {
+    else if (time <= 9) {
         cout << "\nStarting - time interval for one run:  " << "1s" << endl;
         socket_timeout.tv_sec = 1;     
         socket_timeout.tv_usec = 0;   
@@ -346,11 +346,11 @@ void meter(int argc, char const *argv[]) {
             recv_ret = 0;                                   // This measurement will be 0 Mbit/s
         }
         else if (((long)send_ret - (long)recv_ret) > ((long)send_ret / 100)) {
-            estimation += 50;               // If lost packet is over 1% , try bigger usleep
+            estimation += 10;               // If lost packet is over 1% , try bigger usleep
         }
         else {
-            if (estimation >= 50) {         // Else , try smaller usleep if possible
-                estimation -= 50;
+            if (estimation >= 10) {         // Else , try smaller usleep if possible
+                estimation -= 10;
             }
         }
 
@@ -388,6 +388,7 @@ void meter(int argc, char const *argv[]) {
     }
 }
 
+// Reflect application
 void reflect(int argc, char const *argv[]) {
     if (argc != 4) {
         ERR_RET(help);
@@ -439,6 +440,7 @@ void reflect(int argc, char const *argv[]) {
     }
 
     struct sockaddr_in client_address;
+    cout << "Listening on port " << port_number << endl;
 
     /************************************INFINITE LOOP**********************************************************/
 
@@ -461,6 +463,7 @@ void reflect(int argc, char const *argv[]) {
     }
 }
 
+// Main function - find if if meter or reflect
 int main(int argc, char const *argv[]) {
     // Select reflect or meter
     if (argc > 1) {
