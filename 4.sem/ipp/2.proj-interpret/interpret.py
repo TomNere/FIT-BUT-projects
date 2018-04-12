@@ -49,8 +49,9 @@ def getFrame(frame):
 # Translate variable if variable, else return constant
 def varTranslate(var):
     if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string':
-        typeCheck(var)
-        return var
+        new_var = dict(var)
+        typeCheck(new_var)
+        return new_var
     elif var['type'] == 'var':
         frame = getFrame(var['value'][:2])
         if var['value'][3:] in frame:
@@ -79,16 +80,14 @@ def typeCheck(var):
         if number is False:
             retError(SEM_ERR, "Invalid integer value")
         var.update({'value': number})
-
-    if var['type'] == 'bool':
+    elif var['type'] == 'bool':
         if var['value'] == 'true':
             var.update({'value': True})
         elif var['value'] == 'false':
             var.update({'value': False})
         else:
             retError(SEM_ERR, "Invalid bool value")
-
-    if var['type'] == 'string':
+    elif var['type'] == 'string':
         var.update({'value': strCheck(var['value'])})
     elif var['type'] == 'label':
         pass
@@ -115,12 +114,14 @@ def intCheck(var):
 
 
 def strCheck(var):
+    if var is None:     # Empty string
+        return ""
+
     new_string = ""
     counter = 0
     while counter < len(var):
         if var[counter] == '\\':
             number = var[counter + 1:counter + 4]
-            print(number)
             if number.isdigit():
                 new_string += chr(int(number, base=10))
                 counter += 3
@@ -136,6 +137,7 @@ def strCheck(var):
 
 """""""""""""""""""""""""""""""""""""INSTRUCTIONS"""""""""""""""""""""""""""""""""""""""""""
 
+
 # Nothing to do
 def inothing(inst):
     pass
@@ -144,23 +146,26 @@ def inothing(inst):
 def iframes(inst):
     argCheck(inst, 0)
     global tmp_frame
+    global frame_stack
+
     if inst['opcode'] == 'CREATEFRAME':
         tmp_frame.clear()
+        tmp_frame = {'undefined': False}
 
     elif inst['opcode'] == 'PUSHFRAME':
         if tmp_frame['undefined'] is True:  # TF doesn't exist
             retError(FRAME_ERR, 'Undefined temporary frame')
-        global frame_stack
-        frame_stack.append(tmp_frame)
+        frame_stack.append(dict(tmp_frame))
         tmp_frame.clear()
-        tmp_frame['undefined': True]
+        tmp_frame = {'undefined': True}
 
     elif inst['opcode'] == 'POPFRAME':
         if not frame_stack:                 # Empty stack of frames
             retError(FRAME_ERR, 'Stack of frames is empty')
         if tmp_frame['undefined'] is True:  # TF doesn't exist
             retError(FRAME_ERR, 'Undefined temporary frame')
-        tmp_frame = frame_stack[-1]
+
+        tmp_frame = dict(frame_stack[-1])
         del frame_stack[-1]
 
 
@@ -170,6 +175,7 @@ def ireturn(inst):
     if not call_stack:      # Empty stack of calls
         retError(VOID_ERROR, 'Empty call stack')
 
+    #print("callstack:"+str(call_stack[-1]))
     allInst.setCounter(call_stack[-1])
     del call_stack[-1]
 
@@ -193,7 +199,7 @@ def idefvar(inst):
 def icall(inst):
     argCheck(inst, 1)
     global call_stack, allInst
-    call_stack.append(allInst.inst_counter + 1)
+    call_stack.append(allInst.inst_counter)
 
     if inst['args'][0]['type'] == 'label':
         if inst['args'][0]['value'] in label_arr:
@@ -214,16 +220,9 @@ def ipushs(inst):
 
 def ipops(inst):
     argCheck(inst, 1)
-    frame = getFrame(inst['args'][0]['value'][:2])
-    name = inst['args'][0]['value'][3:]
-
-    if name in frame:                           # Defined
-        global data_stack
-        assignValue(inst['args'][0])
-        frame[name] = data_stack[-1]
-        del data_stack[-1]
-    else:
-        retError(VAR_ERR, "Undeclared Variable")
+    global data_stack
+    assignValue(inst['args'][0], data_stack[-1])
+    del data_stack[-1]
 
 
 def iwrite(inst):
@@ -241,7 +240,7 @@ def iwrite(inst):
 
     if inst['opcode'] == 'WRITE':
         print(printed)
-    else:
+    else:                           # Dprint
         sys.stderr.write(printed)
 
 
@@ -256,7 +255,12 @@ def ijump(inst):
 
 def imove(inst):
     var = varTranslate(inst['args'][1])
+    #print('iMove')
+    #print(var)
+    #print(tmp_frame)
     assignValue(inst['args'][0], var)
+    #print(tmp_frame)
+    #print('--------------')
 
 
 def iint2char(inst):
@@ -550,34 +554,52 @@ class InstArr:
 
 
 def createArr(path):
-    tree = ET.parse(path)
-    root = tree.getroot()
     global label_arr
     global allInst
 
-    for child in root:
-        if child.tag == 'instruction':              # If instruction, add to array
-            args = []
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+        inst_order = 1
+        for child in root:
+            if child.tag == 'instruction':              # If instruction, add to array
+                if child.attrib['order'] != str(inst_order) or len(child.attrib) > 2:
+                    sys.stderr.write('Invalid XML element:'+ str(child) + "\n")
+                    exit(XML_ERR)
 
-            for arg in child:                   # Iterate in arguments
-                arg = {
-                    'type': arg.attrib['type'],
-                    'value': arg.text
-                }
-                args.append(arg)
-            allInst.addInst(child.attrib['opcode'], args)       # Add instruction with args to array of all instructions
+                args = []
+                arg_counter = 1
+                for arg in child:                   # Iterate in arguments
+                    if arg.tag[0:3] != 'arg' or arg.tag[3] != str(arg_counter) or len(arg.attrib) > 1:
+                        sys.stderr.write('Invalid XML element:' + str(arg) + "\n")
+                        exit(XML_ERR)
+                    arg = {
+                        'type': arg.attrib['type'],
+                        'value': arg.text
+                    }
+                    args.append(arg)
+                    arg_counter += 1
+                # Add instruction with args to array of all instructions
+                allInst.addInst(child.attrib['opcode'], args)
+                inst_order += 1
 
-            if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
-                if args[0]['type'] != 'label' or len(args) != 1:
-                    retError(SYN_ERR, ARG_STR)
+                if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
+                    if args[0]['type'] != 'label' or len(args) != 1:
+                        retError(SYN_ERR, ARG_STR)
 
-                if args[0]['value'] in label_arr:  # Redefinition of label
-                    retError(SEM_ERR, "Redefinition of label.")
+                    if args[0]['value'] in label_arr:  # Redefinition of label
+                        retError(SEM_ERR, "Redefinition of label")
 
-                label_arr.update({args[0]['value']: child.attrib['order']})
+                    label_arr.update({args[0]['value']: int(child.attrib['order'], base=10)})
 
-        elif child.tag != 'name' and child.tag != 'description':  # Unknown element
-            retError(XML_ERR, "Unknown element.")
+            elif child.tag != 'name' and child.tag != 'description':  # Unknown element
+                sys.stderr.write('Unknown XML element:' + str(child))
+                exit(XML_ERR)
+    except SystemExit as exit_ex:
+        sys.exit(exit_ex.code)
+    except:
+        sys.stderr.write("Invalid XML\n")
+        exit(XML_ERR)
 
 
 """""""""""""""""""""""""""""""""""""""""""""""Global variables"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -592,7 +614,7 @@ tmp_frame = {'undefined': True}
 
 
 def main():
-
+    global tmp_frame
     # Parse arguments
     parser = argparse.ArgumentParser(description='Something')
     parser.add_argument('--source', metavar='--source', nargs=1, help='Source file')
@@ -604,10 +626,14 @@ def main():
     createArr(path)
 
     # Iterate in all instructions
+    #print(allInst.instructions)
     while allInst.inst_counter < allInst.count:
+        #print(frame_stack)
+        #print(allInst.inst_counter)
+        #print(allInst.instructions[allInst.inst_counter])
+        #pprint(global_frame)
         allInst.incCounter()
         mainSwitch(allInst.getInst()['opcode'])
-        #print('frame')
         #pprint(global_frame)
         #print('stack')
         #pprint(data_stack)
