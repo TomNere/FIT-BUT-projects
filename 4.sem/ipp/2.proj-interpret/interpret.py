@@ -104,13 +104,11 @@ def tryInput():
 
 
 def intCheck(var):
-    if var[0] in ('-', '+'):
-        if var[1:].isdigit() is False:
-            return False
-    if var.isdigit() is False:
-        return False
-
-    return int(var, base=10)
+    try:
+        integer = int(var, base=10)
+    except ValueError:
+        integer = False
+    return integer
 
 
 def strCheck(var):
@@ -199,7 +197,7 @@ def idefvar(inst):
 def icall(inst):
     argCheck(inst, 1)
     global call_stack, allInst
-    call_stack.append(allInst.inst_counter)
+    call_stack.append(int(allInst.inst_counter))
 
     if inst['args'][0]['type'] == 'label':
         if inst['args'][0]['value'] in label_arr:
@@ -215,7 +213,7 @@ def ipushs(inst):
     argCheck(inst, 1)
     var = varTranslate(inst['args'][0])
     global data_stack
-    data_stack.append(var)
+    data_stack.append(dict(var))
 
 
 def ipops(inst):
@@ -407,13 +405,12 @@ def istri2int(inst):
     if string['type'] == 'string' and pos['type'] == 'int':
         if (pos['value'] < 0) or (pos['value'] > len(string['value']) - 1):         # Check for valid index
             retError(STR_ERR, 'Index out of bounds')
-        var = False
         if inst['opcode'] == 'STRI2INT':
             var = ord(string['value'][pos['value']])
+            assignValue(inst['args'][0], {'type': 'int', 'value': var})
         elif inst['opcode'] == 'GETCHAR':
             var = string['value'][pos['value']]
-
-        assignValue(inst['args'][0], {'type': 'int', 'value': var})
+            assignValue(inst['args'][0], {'type': 'string', 'value': var})
     else:
         retError(TYPE_ERR, 'Invalid type of operand(s)')
 
@@ -597,8 +594,8 @@ def createArr(path):
                 exit(XML_ERR)
     except SystemExit as exit_ex:
         sys.exit(exit_ex.code)
-    except:
-        sys.stderr.write("Invalid XML\n")
+    except Exception as ex:
+        sys.stderr.write("Invalid XML, exception:\n" + str(ex) + "\n")
         exit(XML_ERR)
 
 
@@ -628,7 +625,8 @@ def main():
     # Iterate in all instructions
     #print(allInst.instructions)
     while allInst.inst_counter < allInst.count:
-        #print(frame_stack)
+        #print(tmp_frame)
+        #print()
         #print(allInst.inst_counter)
         #print(allInst.instructions[allInst.inst_counter])
         #pprint(global_frame)
