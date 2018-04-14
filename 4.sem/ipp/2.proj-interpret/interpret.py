@@ -1,5 +1,6 @@
 import argparse
 import sys                  # Printing to STDERR
+import re                   # Regular expressions
 from pprint import pprint
 import xml.etree.ElementTree as ET
 
@@ -8,7 +9,6 @@ XML_ERR = 31
 SYN_ERR = 32
 ARG_ERR = 10
 IN_ERR = 11
-OUT_ERR = 12
 SEM_ERR = 52
 TYPE_ERR = 53
 VAR_ERR = 54
@@ -27,6 +27,13 @@ def retError(err, msg):
     sys.stderr.write("Error found in instruction number " + str(allInst.inst_counter) + ".\n")
     sys.stderr.write(msg + ".\n")
     exit(err)
+
+def nameCheck(name):
+    if re.match('^[a-zA-Z_\-$&%*]*$', name[0]):
+        if not re.match('^[a-zA-Z0-9_\-$&%*]*$', name[1:]):
+            retError(SYN_ERR, 'Invalid character in name of var/label')
+    else:
+        retError(SYN_ERR, 'Invalid character in name of var/label')
 
 
 def getFrame(frame):
@@ -48,7 +55,7 @@ def getFrame(frame):
 
 # Translate variable if variable, else return constant
 def varTranslate(var):
-    if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string':
+    if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string' or var['type'] == 'type':
         new_var = dict(var)
         typeCheck(new_var)
         return new_var
@@ -57,42 +64,50 @@ def varTranslate(var):
         if var['value'][3:] in frame:
             return frame[var['value'][3:]]
         else:
-            retError(VAR_ERR, "Undefined variable")
+            retError(VAR_ERR, "Undeclared variable")
     else:
         retError(SYN_ERR, "Unknown type of symbol")
 
 
 # Check number of arguments
 def argCheck(inst, number):
-    if len(inst['args']) != number:
-        retError(ARG_ERR, ARG_STR)
+    if len(inst['args']) > 3 or len(inst['args']) != number:
+        retError(XML_ERR, 'Invalid number of operands')
 
 
 def assignValue(var, new_value):
+    if var['type'] != 'var':
+        retError(TYPE_ERR, 'Wrong type of operand')
+
     frame = getFrame(var['value'][:2])
     if var['value'][3:] in frame:
         frame.update({var['value'][3:]: new_value})
+    else:
+        retError(VAR_ERR, 'Undeclared variable')
 
 
 def typeCheck(var):
     if var['type'] == 'int':
+        if var['value'] is None:
+            retError(SYN_ERR, 'Integer operand without value')
         number = intCheck(var['value'])
         if number is False:
             retError(SEM_ERR, "Invalid integer value")
         var.update({'value': number})
     elif var['type'] == 'bool':
+        if var['value'] is None:
+            retError(SYN_ERR, 'Boolean operand without value')
         if var['value'] == 'true':
             var.update({'value': True})
         elif var['value'] == 'false':
             var.update({'value': False})
         else:
             retError(SEM_ERR, "Invalid bool value")
-    elif var['type'] == 'string':
-        var.update({'value': strCheck(var['value'])})
-    elif var['type'] == 'label':
-        pass
+    elif var['type'] == 'type':
+        if var['value'] != 'int' and var['value'] != 'string' and var['value'] != 'bool':
+            retError(SEM_ERR, 'Invalid type')
     else:
-        retError(SYN_ERR, 'Unknown variable type')
+        var.update({'value': strCheck(var['value'])})
 
 
 def tryInput():
@@ -181,9 +196,14 @@ def ireturn(inst):
 def ibreak(inst):
     argCheck(inst, 0)
     global global_frame, tmp_frame, frame_stack
-    sys.stderr.write('Global frame: ' + global_frame + "\n" +
-                     'Local frame: ' + frame_stack[-1] + "\n" +
-                     'Tmp frame: ' + tmp_frame)
+    sys.stderr.write('Global frame: ' + str(global_frame) + "\n" + 'Local frame: ')
+
+    if not frame_stack:
+        sys.stderr.write('empty')
+    else:
+        sys.stderr.write(str(frame_stack[-1]))
+
+    sys.stderr.write("\n" + 'Tmp frame: ' + str(tmp_frame) + "\n")
 
 
 def idefvar(inst):
@@ -191,6 +211,9 @@ def idefvar(inst):
     name = inst['args'][0]['value']
     frame = getFrame(name[:2])
     name = name[3:]
+    nameCheck(name)
+    if name in frame:       # Redefinition
+        retError(SEM_ERR, 'Redefinition of variable')
     frame.update({name: {'type': None, 'value': None}})
 
 
@@ -203,9 +226,9 @@ def icall(inst):
         if inst['args'][0]['value'] in label_arr:
             allInst.setCounter(label_arr[inst['args'][0]['value']])
         else:
-            retError(SEM_ERR, 'Undefined label')
+            retError(SEM_ERR, 'Undefined label.')
     else:
-        retError(TYPE_ERR, 'Label expected.')
+        retError(TYPE_ERR, 'Label expected')
 
 
 # Push value on the top of data stack
@@ -219,8 +242,12 @@ def ipushs(inst):
 def ipops(inst):
     argCheck(inst, 1)
     global data_stack
-    assignValue(inst['args'][0], data_stack[-1])
-    del data_stack[-1]
+
+    if not data_stack:
+        retError(VOID_ERROR, 'Empty data stack')
+    else:
+        assignValue(inst['args'][0], data_stack[-1])
+        del data_stack[-1]
 
 
 def iwrite(inst):
@@ -233,13 +260,21 @@ def iwrite(inst):
             printed = 'true'
         else:
             printed = 'false'
-    else:
+    elif var['type'] == 'string' or var['type'] == 'type':
         printed = var['value']
+    elif var['type'] == 'label':
+        retError(XML_ERR, 'Invalid type for write')
+    else:
+        if inst['opcode'] == 'WRITE':
+            retError(VOID_ERROR, 'Undefined variable')
+        else:
+            sys.stderr.write("Undefined variable.\n")
+            return
 
     if inst['opcode'] == 'WRITE':
         print(printed)
     else:                           # Dprint
-        sys.stderr.write(printed)
+        sys.stderr.write(str(printed))
 
 
 def ijump(inst):
@@ -256,6 +291,9 @@ def imove(inst):
     #print('iMove')
     #print(var)
     #print(tmp_frame)
+    if var['type'] == 'type':
+        retError(TYPE_ERR, 'Wrong type of operand')
+
     assignValue(inst['args'][0], var)
     #print(tmp_frame)
     #print('--------------')
@@ -265,11 +303,13 @@ def iint2char(inst):
     argCheck(inst, 2)
     var = varTranslate(inst['args'][1])
     if var['type'] != 'int':
-        retError(SEM_ERR, 'Integer expected')
+        retError(TYPE_ERR, 'Integer expected')
 
-    char = chr(var['value'])
-    if char is ValueError:                          # Unable to convert
+    try:
+        char = chr(var['value'])
+    except ValueError:              # Unable to convert
         retError(STR_ERR, "Invalid Unicode value")
+
     assignValue(inst['args'][0], {'type': 'string', 'value': char})
 
 
@@ -311,13 +351,12 @@ def istrlen(inst):
 
 def itype(inst):
     argCheck(inst, 2)
-    frame = getFrame(inst['args'][1]['value'][:2])
-    if (frame is not False) and (inst['args'][1]['value'][3:] not in frame):
+    var = varTranslate(inst['args'][1])
+    if var['type'] is None:
         typee = ''
     else:
-        var = varTranslate(inst['args'][1])
         typee = var['type']
-    assignValue(inst['args'][1], {'type': 'string', 'value': typee})
+    assignValue(inst['args'][0], {'type': 'string', 'value': typee})
 
 
 def ievaluation(inst):
@@ -451,8 +490,6 @@ def isetchar(inst):
 
 def ijumpif(inst):
     argCheck(inst, 3)
-    if len(inst['args']) != 3:
-        retError(SYN_ERR, ARG_STR)
 
     var1 = varTranslate(inst['args'][1])
     var2 = varTranslate(inst['args'][2])
@@ -511,7 +548,7 @@ def mainSwitch(inst):
         'JUMPIFNEQ': ijumpif,
     }
 
-    func = switcher.get(inst, lambda: "Unknown")
+    func = switcher.get(inst, lambda x: retError(XML_ERR, 'Unknown opcode'))
     func(allInst.getInst())
 
 
@@ -568,7 +605,7 @@ def createArr(path):
                 arg_counter = 1
                 for arg in child:                   # Iterate in arguments
                     if arg.tag[0:3] != 'arg' or arg.tag[3] != str(arg_counter) or len(arg.attrib) > 1:
-                        sys.stderr.write('Invalid XML element:' + str(arg) + "\n")
+                        sys.stderr.write('Invalid XML element: ' + str(arg) + "\n")
                         exit(XML_ERR)
                     arg = {
                         'type': arg.attrib['type'],
@@ -577,23 +614,30 @@ def createArr(path):
                     args.append(arg)
                     arg_counter += 1
                 # Add instruction with args to array of all instructions
-                allInst.addInst(child.attrib['opcode'], args)
+                allInst.addInst(child.attrib['opcode'].upper(), args)
                 inst_order += 1
 
                 if child.attrib['opcode'] == 'LABEL':   # If label, add to array of all labels
                     if args[0]['type'] != 'label' or len(args) != 1:
-                        retError(SYN_ERR, ARG_STR)
-
+                        allInst.setCounter(inst_order - 1)
+                        retError(TYPE_ERR, 'Invalid operand')
                     if args[0]['value'] in label_arr:  # Redefinition of label
-                        retError(SEM_ERR, "Redefinition of label")
+                        allInst.setCounter(inst_order - 1)
+                        retError(SEM_ERR, 'Redefinition of label')
 
+                    allInst.setCounter(inst_order - 1)      # Only for error message
+                    nameCheck(args[0]['value'])
+                    allInst.setCounter(0)               # Get back
                     label_arr.update({args[0]['value']: int(child.attrib['order'], base=10)})
 
             elif child.tag != 'name' and child.tag != 'description':  # Unknown element
                 sys.stderr.write('Unknown XML element:' + str(child))
                 exit(XML_ERR)
     except SystemExit as exit_ex:
-        sys.exit(exit_ex.code)
+        exit(exit_ex.code)
+    except FileNotFoundError:
+        sys.stderr.write("Unable to open source file.\n")
+        exit(IN_ERR)
     except Exception as ex:
         sys.stderr.write("Invalid XML, exception:\n" + str(ex) + "\n")
         exit(XML_ERR)
@@ -613,14 +657,16 @@ tmp_frame = {'undefined': True}
 def main():
     global tmp_frame
     # Parse arguments
-    parser = argparse.ArgumentParser(description='Something')
-    parser.add_argument('--source', metavar='--source', nargs=1, help='Source file')
-    arguments = parser.parse_args()
+    try:
+        parser = argparse.ArgumentParser(description='Interpret of IPPcode18 XML representantion.')
+        parser.add_argument('--source', metavar='source file', nargs=1, help='source XML file for interpretation')
+        arguments = parser.parse_args()
+    except SystemExit:                  # To return proper value
+        exit(ARG_ERR)
 
     path = arguments.source[0]
-
-    global allInst
     createArr(path)
+    global allInst
 
     # Iterate in all instructions
     #print(allInst.instructions)
