@@ -107,7 +107,7 @@ def typeCheck(var):
             retError(SYN_ERR, 'Integer operand without value')
         number = intCheck(var['value'])     # Check for valid number
         if number is False:
-            retError(SEM_ERR, "Invalid integer value")
+            retError(SYN_ERR, "Invalid integer value")
         var.update({'value': number})       # Assign converted value
     elif var['type'] == 'bool':
         if var['value'] is None:            # Void boolean
@@ -117,10 +117,10 @@ def typeCheck(var):
         elif var['value'] == 'false':
             var.update({'value': False})    # Assign False
         else:
-            retError(SEM_ERR, "Invalid bool value")
+            retError(SYN_ERR, "Invalid bool value")
     elif var['type'] == 'type':             # Type
         if var['value'] != 'int' and var['value'] != 'string' and var['value'] != 'bool':
-            retError(SEM_ERR, 'Invalid type')
+            retError(SYN_ERR, 'Invalid type')
     else:                                   # String
         var.update({'value': strCheck(var['value'])})
 
@@ -157,9 +157,9 @@ def strCheck(var):
                 new_string += chr(int(number, base=10))     # Translate
                 counter += 3                        # Skip number
             else:                                   # Invalid escape sequence
-                retError(SEM_ERR, 'Bad escape sequence in string')
+                retError(SYN_ERR, 'Bad escape sequence in string')
         elif var[counter].isspace():                # Blank character have to be escaped
-            retError(SEM_ERR, 'Unknown character in string')
+            retError(SYN_ERR, 'Unknown character in string')
         else:                                       # Valid character, concatenate
             new_string += var[counter]
         counter += 1
@@ -258,7 +258,7 @@ def icall(inst):
 
 
 def ipushs(inst):
-    # Push value on the top of data stack
+    # Instruction pushs - push value on the top of data stack
     opCheck(inst, 1)
     var = varTranslate(inst['args'][0])             # Translate variable name to value
     global data_stack
@@ -266,10 +266,11 @@ def ipushs(inst):
 
 
 def ipops(inst):
+    # Instruction pops - pop value from data stack
     opCheck(inst, 1)
     global data_stack
 
-    if not data_stack:
+    if not data_stack:                              # Check if data stack is empty
         retError(VOID_ERROR, 'Empty data stack')
     else:
         assignValue(inst['args'][0], data_stack[-1])
@@ -277,8 +278,10 @@ def ipops(inst):
 
 
 def iwrite(inst):
+    # Instruction write
     opCheck(inst, 1)
     var = varTranslate(inst['args'][0])
+    printed = ""
     if var['type'] == 'int':                # Int to str
         printed = str(var['value'])
     elif var['type'] == 'bool':             # Bool values translate
@@ -287,51 +290,50 @@ def iwrite(inst):
         else:
             printed = 'false'
     elif var['type'] == 'string' or var['type'] == 'type':
-        printed = var['value']
-    elif var['type'] == 'label':
+        printed = var['value']              # Simply print value
+    elif var['type'] == 'label':            # Label forbidden
         retError(XML_ERR, 'Invalid type for write')
-    else:
+    else:                                   # Undefined
         if inst['opcode'] == 'WRITE':
             retError(VOID_ERROR, 'Undefined variable')
         else:
             sys.stderr.write("Undefined variable.\n")
             return
 
-    if inst['opcode'] == 'WRITE':
+    if inst['opcode'] == 'WRITE':   # Write
         print(printed)
     else:                           # Dprint
         sys.stderr.write(str(printed))
 
 
 def ijump(inst):
+    # Instruction jump
     opCheck(inst, 1)
     global label_arr, allInst
-    if inst['args'][0]['value'] in label_arr:
-        allInst.setCounter(label_arr[inst['args'][0]['value']])
+    if inst['args'][0]['value'] in label_arr:       # Check  if label exist
+        allInst.setCounter(label_arr[inst['args'][0]['value']])     # Set program counter
     else:
         retError(SEM_ERR, 'Undefined label')
 
 
 def imove(inst):
+    # Instruction move
+    opCheck(2)
     var = varTranslate(inst['args'][1])
-    #print('iMove')
-    #print(var)
-    #print(tmp_frame)
-    if var['type'] == 'type':
+    if var['type'] == 'type':               # Forbidden
         retError(TYPE_ERR, 'Wrong type of operand')
-
-    assignValue(inst['args'][0], var)
-    #print(tmp_frame)
-    #print('--------------')
+    assignValue(inst['args'][0], var)       # Call function which assign value
 
 
 def iint2char(inst):
+    # Instruction int2char
     opCheck(inst, 2)
     var = varTranslate(inst['args'][1])
-    if var['type'] != 'int':
+    char = ""
+    if var['type'] != 'int':        # Must be integer
         retError(TYPE_ERR, 'Integer expected')
 
-    try:
+    try:                            # Try to convert
         char = chr(var['value'])
     except ValueError:              # Unable to convert
         retError(STR_ERR, "Invalid Unicode value")
@@ -340,25 +342,26 @@ def iint2char(inst):
 
 
 def iread(inst):
+    # Instruction read
     opCheck(inst, 2)
-    if inst['args'][1]['type'] != 'type':
+    if inst['args'][1]['type'] != 'type':       # Second operand has to be type
         retError(TYPE_ERR, 'Type expected')
 
     var = tryInput()
     if inst['args'][1]['value'] == 'bool':
-        if var == 'true':
+        if var == 'true':                       # If true, assign True, else False
             var = True
         else:
             var = False
     elif inst['args'][1]['value'] == 'string':
-        if var is False:
+        if var is False:                        # If False, assign '', else leave string
             var = ''
     elif inst['args'][1]['value'] == 'int':
-        if var is False:
+        if var is False:                        # If False, assign 0
             var = 0
         else:
             var = intCheck(var)
-            if var is False:
+            if var is False:                    # Invalid integer, assign 0
                 var = 0
     else:
         retError(SYN_ERR, 'Unknown type')
@@ -367,39 +370,42 @@ def iread(inst):
 
 
 def istrlen(inst):
+    # Instruction strlen
     opCheck(inst, 2)
     string = varTranslate(inst['args'][1])
-    if string['type'] != 'string':
+    if string['type'] != 'string':              # Must be string
         retError(TYPE_ERR, 'String expected')
-    length = len(string['value'])
+    length = len(string['value'])               # Get length of string
     assignValue(inst['args'][0], {'type': 'int', 'value': length})
 
 
 def itype(inst):
+    # Instruction type
     opCheck(inst, 2)
     var = varTranslate(inst['args'][1])
-    if var['type'] is None:
+    if var['type'] is None:             # Undefined variable
         typee = ''
-    else:
+    else:                               # Defined, assign type
         typee = var['type']
     assignValue(inst['args'][0], {'type': 'string', 'value': typee})
 
 
 def ievaluation(inst):
+    # Instructions add, sub, mul, idiv
     opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     number = 0
 
-    if op1['type'] == 'int' and op2['type'] == 'int':
-        if inst['opcode'] == 'ADD':
+    if op1['type'] == 'int' and op2['type'] == 'int':   # Must be numbers
+        if inst['opcode'] == 'ADD':                     # Add
             number = op1['value'] + op2['value']
-        elif inst['opcode'] == 'SUB':
+        elif inst['opcode'] == 'SUB':                   # Sub
             number = op1['value'] - op2['value']
-        elif inst['opcode'] == 'MUL':
+        elif inst['opcode'] == 'MUL':                   # Mul
             number = op1['value'] * op2['value']
-        elif inst['opcode'] == 'IDIV':
-            if op2['value'] != 0:
+        elif inst['opcode'] == 'IDIV':                  # Idiv
+            if op2['value'] != 0:                       # Check for division by zero
                 number = op1['value'] // op2['value']
             else:
                 retError(ZERO_ERR, 'Division by Zero')
@@ -409,20 +415,24 @@ def ievaluation(inst):
 
 
 def icomparison(inst):
+    # Instructions lt, gt, eq
     opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     flag = False
 
+    # Action for int and string
     if (op1['type'] == 'int' and op2['type'] == 'int') or (op1['type'] == 'string' and op2['type'] == 'string'):
         if inst['opcode'] == 'LT':
-            flag =  op1['value'] < op2['value']
+            flag = op1['value'] < op2['value']
         elif inst['opcode'] == 'GT':
             flag = op1['value'] > op2['value']
         elif inst['opcode'] == 'EQ':
             flag = op1['value'] == op2['value']
 
+    # Action for bool
     elif op1['type'] == 'bool' and op2['type'] == 'bool':
+        # Defined in project specification
         if inst['opcode'] == 'LT':
             flag = op1['value'] is False and op2['value'] is True
         elif inst['opcode'] == 'GT':
@@ -436,11 +446,13 @@ def icomparison(inst):
 
 
 def ilogic(inst):
+    # Instruction and, or
     opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     flag = False
 
+    # Operands have to be bool
     if op1['type'] == 'bool' and op2['type'] == 'bool':
         if inst['opcode'] == 'AND':
             flag = op1['value'] and op2['value']
@@ -453,9 +465,11 @@ def ilogic(inst):
 
 
 def inot(inst):
+    # Instruction not
     opCheck(inst, 2)
     op1 = varTranslate(inst['args'][1])
 
+    # Operand has to be bool
     if op1['type'] == 'bool':
         assignValue(inst['args'][0], {'type': 'bool', 'value': not op1['value']})
     else:
@@ -463,29 +477,31 @@ def inot(inst):
 
 
 def istri2int(inst):
+    #Instructions stri2int, getchar
     opCheck(inst, 3)
     string = varTranslate(inst['args'][1])
     pos = varTranslate(inst['args'][2])
 
     if string['type'] == 'string' and pos['type'] == 'int':
-        if (pos['value'] < 0) or (pos['value'] > len(string['value']) - 1):         # Check for valid index
+        if (pos['value'] < 0) or (pos['value'] > len(string['value']) - 1):     # Check for valid index
             retError(STR_ERR, 'Index out of bounds')
         if inst['opcode'] == 'STRI2INT':
-            var = ord(string['value'][pos['value']])
+            var = ord(string['value'][pos['value']])                            # Get ordinal value
             assignValue(inst['args'][0], {'type': 'int', 'value': var})
         elif inst['opcode'] == 'GETCHAR':
-            var = string['value'][pos['value']]
+            var = string['value'][pos['value']]                                 # Get one character
             assignValue(inst['args'][0], {'type': 'string', 'value': var})
     else:
         retError(TYPE_ERR, 'Invalid type of operand(s)')
 
 
 def iconcat(inst):
+    # Instruction concat
     opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
 
-    if op1['type'] == 'string' and op2['type'] == 'string':
+    if op1['type'] == 'string' and op2['type'] == 'string':     # Must be strings
         string = op1['value'] + op2['value']
         assignValue(inst['args'][0], {'type': 'string', 'value': string})
     else:
@@ -493,11 +509,13 @@ def iconcat(inst):
 
 
 def isetchar(inst):
+    # Instruction setchar
     opCheck(inst, 3)
     pos = varTranslate(inst['args'][1])
     char = varTranslate(inst['args'][2])
     var = False
 
+    # First operand has to be string variable
     if inst['args'][0]['type'] == 'var':
         var = varTranslate(inst['args'][0])
     else:
@@ -508,6 +526,7 @@ def isetchar(inst):
         if (pos['value'] < 0) or (pos['value'] > len(var['value']) - 1) or (len(char['value']) == 0):
             retError(STR_ERR, 'Index out of bounds')
 
+        # Do stuff
         var['value'] = var['value'][:pos['value']] + char['value'][0] + var['value'][pos['value'] + 1:]
         assignValue(inst['args'][0], var)
     else:
@@ -515,19 +534,20 @@ def isetchar(inst):
 
 
 def ijumpif(inst):
+    # Instructions jumpifeq, jumpifneq
     opCheck(inst, 3)
 
     var1 = varTranslate(inst['args'][1])
     var2 = varTranslate(inst['args'][2])
 
-    if var1['type'] != var2['type']:
+    if var1['type'] != var2['type']:                # Operands have to be same type
         retError(TYPE_ERR, "Type incompatibility")
 
-    if inst['args'][0]['value'] in label_arr:
-        if inst['opcode'] == 'JUMPIFEQ':                                    # JUMPIFEQ
+    if inst['args'][0]['value'] in label_arr:       # Check if label exists
+        if inst['opcode'] == 'JUMPIFEQ':            # JUMPIFEQ
             if var1 == var2:
                 allInst.setCounter(label_arr[inst['args'][0]['value']])
-        else:                                                               # JUMPIFNEQ
+        else:                                       # JUMPIFNEQ
             if var1 != var2:
                 allInst.setCounter(label_arr[inst['args'][0]['value']])
     else:
@@ -535,6 +555,7 @@ def ijumpif(inst):
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""MAIN_SWITCH"""""""""""""""""""""""""""""""""""""""""""""""""""
+
 
 def mainSwitch(inst):
     switcher = {
@@ -574,22 +595,21 @@ def mainSwitch(inst):
         'JUMPIFNEQ': ijumpif,
     }
 
+    # Call function or exit if opcode is invalid
     func = switcher.get(inst, lambda x: retError(XML_ERR, 'Unknown opcode'))
     func(allInst.getInst())
 
 
-""" Class representing array of all instructions
-#   Include program counter
-"""
 class InstArr:
-
+    # Class representing list of all instructions
+    # Implements also program counter
     def __init__(self):
-        self.count = 0
-        self.instructions = []
-        self.inst_counter = 0
-        self.count_stack = []
+        self.count = 0              # Number of instructions
+        self.instructions = []      # List of instructions
+        self.program_counter = 0    # Program counter
 
     def addInst(self, opcode, args):
+        # add instruction to list of all instructions
         instruction = {
             'opcode': opcode,
             'args': args
@@ -598,19 +618,16 @@ class InstArr:
         self.count += 1
 
     def getInst(self):
-        return self.instructions[self.inst_counter - 1]
+        return self.instructions[self.program_counter - 1]
 
     def incCounter(self):
-        self.inst_counter += 1
+        self.program_counter += 1
 
     def setCounter(self, number):
-        self.inst_counter = number
+        self.program_counter = number
 
     def getCounter(self):
-        return self.inst_counter
-
-    def show(self):
-        print(self.instructions)
+        return self.program_counter
 
 
 def createArr(path):
