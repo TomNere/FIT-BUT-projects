@@ -1,8 +1,16 @@
-import argparse
-import sys                  # Printing to STDERR
-import re                   # Regular expressions
-from pprint import pprint
-import xml.etree.ElementTree as ET
+"""
+#  Course:      Principles of Programming Languages (IPP)
+#  Project:     Interpret of IPPcode18 XML representation
+#  File:        interpret.py
+#
+#  Author: Tomáš Nereča : xnerec00
+"""
+
+
+import argparse                     # Parsing arguments
+import sys                          # Printing to STDERR
+import re                           # Regular expressions
+import xml.etree.ElementTree as ET  # Parsing XML
 
 """""""""""""""""""""""""""""""""ERROR_CODES"""""""""""""""""""""""""""""""""""
 XML_ERR = 31
@@ -18,18 +26,20 @@ ZERO_ERR = 57
 STR_ERR = 58
 OTHER_ERR = 99
 
-ARG_STR = "Invalid argument(s)"
 
 """""""""""""""""""""""""""""""""""""HELPING_FUNCTIONS"""""""""""""""""""""""""""""""""""""""""""
 
 
 def retError(err, msg):
-    sys.stderr.write("Error found in instruction number " + str(allInst.inst_counter) + ".\n")
+    # Print error message to stderr and exit
+    sys.stderr.write("Error found in instruction number " + str(allInst.getCounter()) + ".\n")
     sys.stderr.write(msg + ".\n")
     exit(err)
 
+
 def nameCheck(name):
-    if re.match('^[a-zA-Z_\-$&%*]*$', name[0]):
+    # Check if name of variable or label is valid
+    if re.match('^[a-zA-Z_\-$&%*]*$', name[0]):             # First character musn't be digit
         if not re.match('^[a-zA-Z0-9_\-$&%*]*$', name[1:]):
             retError(SYN_ERR, 'Invalid character in name of var/label')
     else:
@@ -37,15 +47,16 @@ def nameCheck(name):
 
 
 def getFrame(frame):
+    # Check for frame name and return proper data structure
     global global_frame, tmp_frame, frame_stack
 
     if frame == 'GF':
         return global_frame
     elif frame == 'LF':
-        if not frame_stack:
+        if not frame_stack:             # Check if LF is defined
             retError(FRAME_ERR, 'Undefined local frame')
         return frame_stack[-1]
-    elif frame == 'TF':
+    elif frame == 'TF':                 # Check if TF is defined
         if tmp_frame['undefined'] is True:
             retError(FRAME_ERR, 'Undefined temporary frame')
         return tmp_frame
@@ -53,96 +64,103 @@ def getFrame(frame):
         retError(SYN_ERR, 'Invalid variable name')
 
 
-# Translate variable if variable, else return constant
 def varTranslate(var):
+    # Translate variable if variable, else return constant
     if var['type'] == 'bool' or var['type'] == 'int' or var['type'] == 'string' or var['type'] == 'type':
-        new_var = dict(var)
+        new_var = dict(var)         # Need to make a copy not only reference
         typeCheck(new_var)
         return new_var
     elif var['type'] == 'var':
         frame = getFrame(var['value'][:2])
         if var['value'][3:] in frame:
+            if var['type'] is None:     # Variable is declared but undefined
+                retError(VOID_ERROR, "Undefined variable")
             return frame[var['value'][3:]]
         else:
             retError(VAR_ERR, "Undeclared variable")
-    else:
+    else:                                               # Label can't be here
         retError(SYN_ERR, "Unknown type of symbol")
 
 
-# Check number of arguments
-def argCheck(inst, number):
+def opCheck(inst, number):
+    # Check number of operands
     if len(inst['args']) > 3 or len(inst['args']) != number:
         retError(XML_ERR, 'Invalid number of operands')
 
 
 def assignValue(var, new_value):
+    # Assign new_value to variable
     if var['type'] != 'var':
         retError(TYPE_ERR, 'Wrong type of operand')
 
     frame = getFrame(var['value'][:2])
-    if var['value'][3:] in frame:
+    if var['value'][3:] in frame:           # If variable exists in frame update, else error
         frame.update({var['value'][3:]: new_value})
     else:
         retError(VAR_ERR, 'Undeclared variable')
 
 
 def typeCheck(var):
+    # Check if constant is valid
     if var['type'] == 'int':
-        if var['value'] is None:
+        if var['value'] is None:            # Void number
             retError(SYN_ERR, 'Integer operand without value')
-        number = intCheck(var['value'])
+        number = intCheck(var['value'])     # Check for valid number
         if number is False:
             retError(SEM_ERR, "Invalid integer value")
-        var.update({'value': number})
+        var.update({'value': number})       # Assign converted value
     elif var['type'] == 'bool':
-        if var['value'] is None:
+        if var['value'] is None:            # Void boolean
             retError(SYN_ERR, 'Boolean operand without value')
         if var['value'] == 'true':
-            var.update({'value': True})
+            var.update({'value': True})     # Assign True
         elif var['value'] == 'false':
-            var.update({'value': False})
+            var.update({'value': False})    # Assign False
         else:
             retError(SEM_ERR, "Invalid bool value")
-    elif var['type'] == 'type':
+    elif var['type'] == 'type':             # Type
         if var['value'] != 'int' and var['value'] != 'string' and var['value'] != 'bool':
             retError(SEM_ERR, 'Invalid type')
-    else:
+    else:                                   # String
         var.update({'value': strCheck(var['value'])})
 
 
 def tryInput():
+    # Try to read from stdin and catch exception
     try:
         var = input()
-    except EOFError:
+    except EOFError:        # If EOF, false
         var = False
     return var
 
 
 def intCheck(var):
+    # Try to convert string to decimal integer and catch exception
     try:
         integer = int(var, base=10)
-    except ValueError:
+    except ValueError:              # Invalid integer
         integer = False
     return integer
 
 
 def strCheck(var):
+    # Check for valid string and translate escape sequences
     if var is None:     # Empty string
         return ""
 
     new_string = ""
     counter = 0
     while counter < len(var):
-        if var[counter] == '\\':
-            number = var[counter + 1:counter + 4]
-            if number.isdigit():
-                new_string += chr(int(number, base=10))
-                counter += 3
-            else:
+        if var[counter] == '\\':    # Escape sequence
+            number = var[counter + 1:counter + 4]   # \000
+            if number.isdigit():                    # Must be digit 000-999
+                new_string += chr(int(number, base=10))     # Translate
+                counter += 3                        # Skip number
+            else:                                   # Invalid escape sequence
                 retError(SEM_ERR, 'Bad escape sequence in string')
-        elif var[counter].isspace():
+        elif var[counter].isspace():                # Blank character have to be escaped
             retError(SEM_ERR, 'Unknown character in string')
-        else:
+        else:                                       # Valid character, concatenate
             new_string += var[counter]
         counter += 1
     return new_string
@@ -151,96 +169,104 @@ def strCheck(var):
 """""""""""""""""""""""""""""""""""""INSTRUCTIONS"""""""""""""""""""""""""""""""""""""""""""
 
 
-# Nothing to do
 def inothing(inst):
+    # Nothing to do
     pass
 
 
 def iframes(inst):
-    argCheck(inst, 0)
+    # Instructions with frames
+    opCheck(inst, 0)
     global tmp_frame
     global frame_stack
 
     if inst['opcode'] == 'CREATEFRAME':
-        tmp_frame.clear()
-        tmp_frame = {'undefined': False}
+        tmp_frame.clear()                       # Clear old TF
+        tmp_frame = {'undefined': False}        # TF is now defined
 
     elif inst['opcode'] == 'PUSHFRAME':
-        if tmp_frame['undefined'] is True:  # TF doesn't exist
+        if tmp_frame['undefined'] is True:      # TF doesn't exist
             retError(FRAME_ERR, 'Undefined temporary frame')
-        frame_stack.append(dict(tmp_frame))
-        tmp_frame.clear()
-        tmp_frame = {'undefined': True}
+        frame_stack.append(dict(tmp_frame))     # Push frame to stack of frames
+        tmp_frame.clear()                       # Clean TF
+        tmp_frame = {'undefined': True}         # TF is now undefined
 
     elif inst['opcode'] == 'POPFRAME':
-        if not frame_stack:                 # Empty stack of frames
+        if not frame_stack:                     # Empty stack of frames
             retError(FRAME_ERR, 'Stack of frames is empty')
-        if tmp_frame['undefined'] is True:  # TF doesn't exist
+        if tmp_frame['undefined'] is True:      # TF doesn't exist
             retError(FRAME_ERR, 'Undefined temporary frame')
-
-        tmp_frame = dict(frame_stack[-1])
-        del frame_stack[-1]
+        tmp_frame = dict(frame_stack[-1])       # Assign LF to TF
+        del frame_stack[-1]                     # Delete old LF
 
 
 def ireturn(inst):
-    argCheck(inst, 0)
+    # Instruction return
+    opCheck(inst, 0)
     global call_stack
+
     if not call_stack:      # Empty stack of calls
         retError(VOID_ERROR, 'Empty call stack')
 
-    #print("callstack:"+str(call_stack[-1]))
-    allInst.setCounter(call_stack[-1])
-    del call_stack[-1]
+    allInst.setCounter(call_stack[-1])  # Set program counter from top of stack
+    del call_stack[-1]                  # Delete value on the top of stack
 
 
 def ibreak(inst):
-    argCheck(inst, 0)
+    # Instruction break
+    opCheck(inst, 0)
     global global_frame, tmp_frame, frame_stack
+
+    # Print content of GF
     sys.stderr.write('Global frame: ' + str(global_frame) + "\n" + 'Local frame: ')
 
+    # Check if LF exist's
     if not frame_stack:
         sys.stderr.write('empty')
     else:
-        sys.stderr.write(str(frame_stack[-1]))
+        sys.stderr.write(str(frame_stack[-1]))      # Print content of LF
 
+    # Print content of TF
     sys.stderr.write("\n" + 'Tmp frame: ' + str(tmp_frame) + "\n")
 
 
 def idefvar(inst):
-    argCheck(inst, 1)
-    name = inst['args'][0]['value']
-    frame = getFrame(name[:2])
+    # Instruction defvar
+    opCheck(inst, 1)
+    name = inst['args'][0]['value']     # Name of variable
+    frame = getFrame(name[:2])          # Get frame
     name = name[3:]
-    nameCheck(name)
-    if name in frame:       # Redefinition
+    nameCheck(name)                     # Check for valid variable name
+    if name in frame:       # Variable exist's in frame
         retError(SEM_ERR, 'Redefinition of variable')
-    frame.update({name: {'type': None, 'value': None}})
+    frame.update({name: {'type': None, 'value': None}})     # Create new undefined variable in frame
 
 
 def icall(inst):
-    argCheck(inst, 1)
+    # Instruction call
+    opCheck(inst, 1)
     global call_stack, allInst
-    call_stack.append(int(allInst.inst_counter))
+    call_stack.append(int(allInst.getCounter()))    # Push copy of program counter to stack of calls
 
-    if inst['args'][0]['type'] == 'label':
-        if inst['args'][0]['value'] in label_arr:
-            allInst.setCounter(label_arr[inst['args'][0]['value']])
+    if inst['args'][0]['type'] == 'label':          # Must be label
+        if inst['args'][0]['value'] in label_arr:   # Label exists
+            allInst.setCounter(label_arr[inst['args'][0]['value']])     # Set new program counter
         else:
             retError(SEM_ERR, 'Undefined label.')
     else:
-        retError(TYPE_ERR, 'Label expected')
+        retError(SYN_ERR, 'Label expected')
 
 
-# Push value on the top of data stack
 def ipushs(inst):
-    argCheck(inst, 1)
-    var = varTranslate(inst['args'][0])
+    # Push value on the top of data stack
+    opCheck(inst, 1)
+    var = varTranslate(inst['args'][0])             # Translate variable name to value
     global data_stack
-    data_stack.append(dict(var))
+    data_stack.append(dict(var))                    # Push copy of variable to the top of data stack
 
 
 def ipops(inst):
-    argCheck(inst, 1)
+    opCheck(inst, 1)
     global data_stack
 
     if not data_stack:
@@ -251,7 +277,7 @@ def ipops(inst):
 
 
 def iwrite(inst):
-    argCheck(inst, 1)
+    opCheck(inst, 1)
     var = varTranslate(inst['args'][0])
     if var['type'] == 'int':                # Int to str
         printed = str(var['value'])
@@ -278,7 +304,7 @@ def iwrite(inst):
 
 
 def ijump(inst):
-    argCheck(inst, 1)
+    opCheck(inst, 1)
     global label_arr, allInst
     if inst['args'][0]['value'] in label_arr:
         allInst.setCounter(label_arr[inst['args'][0]['value']])
@@ -300,7 +326,7 @@ def imove(inst):
 
 
 def iint2char(inst):
-    argCheck(inst, 2)
+    opCheck(inst, 2)
     var = varTranslate(inst['args'][1])
     if var['type'] != 'int':
         retError(TYPE_ERR, 'Integer expected')
@@ -314,7 +340,7 @@ def iint2char(inst):
 
 
 def iread(inst):
-    argCheck(inst, 2)
+    opCheck(inst, 2)
     if inst['args'][1]['type'] != 'type':
         retError(TYPE_ERR, 'Type expected')
 
@@ -341,7 +367,7 @@ def iread(inst):
 
 
 def istrlen(inst):
-    argCheck(inst, 2)
+    opCheck(inst, 2)
     string = varTranslate(inst['args'][1])
     if string['type'] != 'string':
         retError(TYPE_ERR, 'String expected')
@@ -350,7 +376,7 @@ def istrlen(inst):
 
 
 def itype(inst):
-    argCheck(inst, 2)
+    opCheck(inst, 2)
     var = varTranslate(inst['args'][1])
     if var['type'] is None:
         typee = ''
@@ -360,7 +386,7 @@ def itype(inst):
 
 
 def ievaluation(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     number = 0
@@ -383,7 +409,7 @@ def ievaluation(inst):
 
 
 def icomparison(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     flag = False
@@ -410,7 +436,7 @@ def icomparison(inst):
 
 
 def ilogic(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
     flag = False
@@ -427,7 +453,7 @@ def ilogic(inst):
 
 
 def inot(inst):
-    argCheck(inst, 2)
+    opCheck(inst, 2)
     op1 = varTranslate(inst['args'][1])
 
     if op1['type'] == 'bool':
@@ -437,7 +463,7 @@ def inot(inst):
 
 
 def istri2int(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     string = varTranslate(inst['args'][1])
     pos = varTranslate(inst['args'][2])
 
@@ -455,7 +481,7 @@ def istri2int(inst):
 
 
 def iconcat(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     op1 = varTranslate(inst['args'][1])
     op2 = varTranslate(inst['args'][2])
 
@@ -467,7 +493,7 @@ def iconcat(inst):
 
 
 def isetchar(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
     pos = varTranslate(inst['args'][1])
     char = varTranslate(inst['args'][2])
     var = False
@@ -489,7 +515,7 @@ def isetchar(inst):
 
 
 def ijumpif(inst):
-    argCheck(inst, 3)
+    opCheck(inst, 3)
 
     var1 = varTranslate(inst['args'][1])
     var2 = varTranslate(inst['args'][2])
@@ -580,11 +606,11 @@ class InstArr:
     def setCounter(self, number):
         self.inst_counter = number
 
-    def stackAdd(self, number):
-        self.count_stack.append(number)
+    def getCounter(self):
+        return self.inst_counter
 
     def show(self):
-        pprint(self.instructions)
+        print(self.instructions)
 
 
 def createArr(path):
@@ -670,7 +696,7 @@ def main():
 
     # Iterate in all instructions
     #print(allInst.instructions)
-    while allInst.inst_counter < allInst.count:
+    while allInst.getCounter() < allInst.count:
         #print(tmp_frame)
         #print()
         #print(allInst.inst_counter)
