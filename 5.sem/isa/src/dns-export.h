@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <string.h>
 
 // IP address container that is IP version agnostic.
 // The IPvX_MOVE macros handle filling these with packet data correctly.
@@ -18,6 +19,18 @@ typedef struct {
     uint32_t length;
     uint8_t proto;
 } ip_info;
+
+
+
+
+
+
+
+
+
+
+
+
 
 #include <pcap.h>
 #include <sys/types.h>
@@ -163,3 +176,4 @@ typedef struct {
 	char data[0];
 } packet_desc;
 #pragma pack(pop)
+
