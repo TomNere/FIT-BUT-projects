@@ -138,57 +138,6 @@ const string help = "Invalid parameters!\n\n"
 
 /*****************************************************************************************************************************/
 
-// Holds the information for a dns question.
-typedef struct dns_question
-{
-    char *name;
-    uint16_t type;
-    uint16_t cls;
-    struct dns_question *next;
-} dns_question;
-
-// Holds the information for a dns resource record.
-typedef struct dns_rr
-{
-    char *name;
-    uint16_t type;
-    uint16_t cls;
-    const char *rr_name;
-    uint16_t ttl;
-    uint16_t rdlength;
-    uint16_t data_len;
-    char *data;
-    struct dns_rr *next;
-} dns_rr;
-
-// Holds general DNS information.
-typedef struct
-{
-    uint16_t id;
-    char qr;
-    char AA;
-    char TC;
-    uint8_t rcode;
-    uint8_t opcode;
-    uint16_t qdcount;
-    dns_question *queries;
-    uint16_t ancount;
-    dns_rr *answers;
-    uint16_t nscount;
-    dns_rr *name_servers;
-    uint16_t arcount;
-    dns_rr *additional;
-} dns_info;
-
-// Transport information.
-typedef struct
-{
-    uint16_t srcport;
-    uint16_t dstport;
-    // Length of the payload.
-    uint16_t length;
-    uint8_t transport;
-} transport_info;
 /********************************************************** METHODS **********************************************************/
 
 // Write stats to stdout
@@ -549,6 +498,40 @@ void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *pkthdr, const
     }
     if (packet == NULL) return;
 
+        // Transport layer parsing. 
+    if (ip.proto == 17) {
+        // Parse the udp and this single bit of DNS, and output it.
+        dns_info dns;
+        transport_info udp;
+        pos = udpParse(pos, &header, packet, &udp);
+        if ( pos == 0 ) return;
+        // Only do deduplication if DEDUPS > 0.
+        // if (conf->DEDUPS != 0 ) {
+        //     if (dedup(pos, &header, packet, &ip, &udp, conf) == 1) {
+        //         // A duplicate packet.
+        //         return;
+        //     }
+        // }
+
+        pos = dns_parse(pos, &header, packet, &dns, !FORCE);
+
+        printSummary(&ip, &udp, &dns, &header);
+    } else if (ip.proto == 6) {
+        // Hand the tcp packet over for later reconstruction.
+        //tcp_parse(pos, &header, packet, &ip, conf); 
+    } else {
+        fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
+        return;
+    }
+   
+    if (packet != origPacket) {
+        // Free data from artificially constructed packets.
+        free(packet);
+    }
+
+    // Expire tcp sessions, and output them if possible.
+    fprintf(stderr, "Expiring TCP.\n");
+    //tcp_expire(conf, &header.ts);
 }
 
 void logFile(string strFile, string strLog)
