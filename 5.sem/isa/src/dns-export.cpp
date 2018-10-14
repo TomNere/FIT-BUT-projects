@@ -7,13 +7,13 @@
 #include <list>
 #include <iterator>
 #include <sstream>
-#include "helpers.cpp"
+#include "parsers.cpp"
 
 using namespace std;
 int packetCount = 0;
 int datalink;
 
-struct ip_fragment* ipFragmentHead = NULL;
+
 
 /******************************************************** CLASSES ************************************************************/
 
@@ -123,20 +123,6 @@ class RecordCollection
 
 };
 
-/******************************************************** CONST & MACROS *******************************************************/
-
-#define ERR_RET(message)     \
-    cerr << message << " Terminating." << endl; \
-    exit(EXIT_FAILURE);
-
-#define LOGGING(message) \
-    cerr << "LOG: ";     \
-    message << endl;
-
-const string help = "Invalid parameters!\n\n"
-                    "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n";
-
-/*****************************************************************************************************************************/
 
 /********************************************************** METHODS **********************************************************/
 
@@ -203,231 +189,6 @@ raw_parameters parseArg(int argc, char const *argv[])
     return params;
 }
 
-// Parse the IPv4 header. May point p_packet to a new packet data array,
-// which means zero is a valid return value. Sets p_packet to NULL on error.
-// See RFC791
-uint32_t ipv4Parse(uint32_t pos, struct pcap_pkthdr *header, 
-                    uint8_t ** p_packet, ipInfo * ip) {
-
-    uint32_t h_len;
-    ip_fragment* frag = NULL;
-    uint8_t frag_mf;
-    uint16_t frag_offset;
-
-    // For convenience and code consistency, dereference the packet **.
-    uint8_t* packet = *p_packet;
-
-    if (header-> len - pos < 20) {
-        fprintf(stderr, "Truncated Packet(ipv4)\n");
-        *p_packet = NULL;
-        return 0;
-    }
-
-    h_len = packet[pos] & 0x0f;
-    ip->length = (packet[pos+2] << 8) + packet[pos+3] - h_len*4;
-    ip->proto = packet[pos+9];
-
-    IPv4_MOVE(ip->src, packet + pos + 12);
-    IPv4_MOVE(ip->dst, packet + pos + 16);
-
-    // Set if NOT the last fragment.
-    frag_mf = (packet[pos+6] & 0x20) >> 5;
-    // Offset for this data in the fragment.
-    frag_offset = ((packet[pos+6] & 0x1f) << 11) + (packet[pos+7] << 3);
-
-    // SHOW_RAW(
-    //     printf("\nipv4\n");
-    //     print_packet(header->len, packet, pos, pos + 4*h_len, 4);
-    // )
-    // VERBOSE(
-    //     printf("version: %d, length: %d, proto: %d\n", 
-    //             IPv4, ip->length, ip->proto);
-    //     printf("src ip: %s, ", iptostr(&ip->src));
-    //     printf("dst ip: %s\n", iptostr(&ip->dst));
-    // )
-
-    if (frag_mf == 1 || frag_offset != 0) {
-        //VERBOSE(printf("Fragmented IPv4, offset: %u, mf:%u\n", frag_offset,
-        //                                                      frag_mf);)
-        frag = (ip_fragment*) malloc(sizeof(ip_fragment));
-        frag->start = frag_offset;
-        // We don't try to deal with endianness here, since it 
-        // won't matter as long as we're consistent.
-        frag->islast = !frag_mf;
-        frag->id = *((uint16_t *)(packet + pos + 4));
-        frag->src = ip->src;
-        frag->dst = ip->dst;
-        frag->end = frag->start + ip->length;
-        frag->data = (uint8_t*) malloc(sizeof(uint8_t) * ip->length);
-        frag->next = frag->child = NULL;
-        memcpy(frag->data, packet + pos + 4*h_len, ip->length);
-        // Add the fragment to the list.
-        // If this completed the packet, it is returned.
-        frag = ip_frag_add(frag, ipFragmentHead);
-        if (frag != NULL) {
-            // Update the IP info on the reassembled data.
-            header->len = ip->length = frag->end - frag->start;
-            *p_packet = frag->data;
-            free(frag);
-            return 0;
-        }
-        // Signals that there is no more work to do on this packet.
-        *p_packet = NULL;
-        return 0;
-    } 
-
-    // move the position up past the options section.
-    return pos + 4*h_len;
-}
-
-
-// Parse the IPv6 header. May point p_packet to a new packet data array,
-// which means zero is a valid return value. Sets p_packet to NULL on error.
-// See RFC2460
-uint32_t ipv6Parse(uint32_t pos, struct pcap_pkthdr *header,
-                    uint8_t ** p_packet, ipInfo * ip) {
-
-    // For convenience and code consistency, dereference the packet **.
-    uint8_t * packet = *p_packet;
-
-    // In case the IP packet is a fragment.
-    ip_fragment * frag = NULL;
-    uint32_t header_len = 0;
-
-    if (header->len < (pos + 40)) {
-        fprintf(stderr, "Truncated Packet(ipv6)\n");
-        *p_packet=NULL; return 0;
-    }
-    ip->length = (packet[pos+4] << 8) + packet[pos+5];
-    IPv6_MOVE(ip->src, packet + pos + 8);
-    IPv6_MOVE(ip->dst, packet + pos + 24);
-
-    // Jumbo grams will have a length of zero. We'll choose to ignore those,
-    // and any other zero length packets.
-    if (ip->length == 0) {
-        fprintf(stderr, "Zero Length IP packet, possible Jumbo Payload.\n");
-        *p_packet=NULL; return 0;
-    }
-
-    uint8_t next_hdr = packet[pos+6];
-    //VERBOSE(print_packet(header->len, packet, pos, pos+40, 4);)
-    fprintf(stderr, "IPv6 src: %s, ", iptostr(&ip->src));
-    fprintf(stderr, "IPv6 dst: %s\n", iptostr(&ip->dst));
-    pos += 40;
-   
-    // We pretty much have no choice but to parse all extended sections,
-    // since there is nothing to tell where the actual data is.
-    uint8_t done = 0;
-    while (done == 0) {
-        fprintf(stderr, "IPv6, next header: %u\n", next_hdr);
-        switch (next_hdr) {
-            // Handle hop-by-hop, dest, and routing options.
-            // Yay for consistent layouts.
-            case IPPROTO_HOPOPTS:
-            case IPPROTO_DSTOPTS:
-            case IPPROTO_ROUTING:
-                if (header->len < (pos + 16)) {
-                    fprintf(stderr, "Truncated Packet(ipv6)\n");
-                    *p_packet = NULL; return 0;
-                }
-                next_hdr = packet[pos];
-                // The headers are 16 bytes longer.
-                header_len += 16;
-                pos += packet[pos+1] + 1;
-                break;
-            case 51: // Authentication Header. See RFC4302
-                if (header->len < (pos + 2)) {
-                    fprintf(stderr, "Truncated Packet(ipv6)\n");
-                    *p_packet = NULL; return 0;
-                } 
-                next_hdr = packet[pos];
-                header_len += (packet[pos+1] + 2) * 4;
-                pos += (packet[pos+1] + 2) * 4;
-                if (header->len < pos) {
-                    fprintf(stderr, "Truncated Packet(ipv6)\n");
-                    *p_packet = NULL; return 0;
-                } 
-                break;
-            case 50: // ESP Protocol. See RFC4303.
-                // We don't support ESP.
-                fprintf(stderr, "Unsupported protocol: IPv6 ESP.\n");
-                if (frag != NULL) free(frag);
-                *p_packet = NULL; return 0;
-            case 135: // IPv6 Mobility See RFC 6275
-                if (header->len < (pos + 2)) {
-                    fprintf(stderr, "Truncated Packet(ipv6)\n");
-                    *p_packet = NULL; return 0;
-                }  
-                next_hdr = packet[pos];
-                header_len += packet[pos+1] * 8;
-                pos += packet[pos+1] * 8;
-                if (header->len < pos) {
-                    fprintf(stderr, "Truncated Packet(ipv6)\n");
-                    *p_packet = NULL; return 0;
-                } 
-                break;
-            case IPPROTO_FRAGMENT:
-                // IP fragment.
-                next_hdr = packet[pos];
-                frag = (ip_fragment*) malloc(sizeof(ip_fragment));
-                // Get the offset of the data for this fragment.
-                frag->start = (packet[pos+2] << 8) + (packet[pos+3] & 0xf4);
-                frag->islast = !(packet[pos+3] & 0x01);
-                // We don't try to deal with endianness here, since it 
-                // won't matter as long as we're consistent.
-                frag->id = *(uint32_t *)(packet+pos+4);
-                // The headers are 8 bytes longer.
-                header_len += 8;
-                pos += 8;
-                break;
-            case TCP:
-            case UDP:
-                done = 1; 
-                break;
-            default:
-                fprintf(stderr, "Unsupported IPv6 proto(%u).\n", next_hdr);
-                *p_packet = NULL; return 0;
-        }
-    }
-
-    // check for int overflow
-    if (header_len > ip->length) {
-      fprintf(stderr, "Malformed packet(ipv6)\n");
-      *p_packet = NULL;
-      return 0;
-    }
-
-    ip->proto = next_hdr;
-    ip->length = ip->length - header_len;
-
-    // Handle fragments.
-    if (frag != NULL) {
-        frag->src = ip->src;
-        frag->dst = ip->dst;
-        frag->end = frag->start + ip->length;
-        frag->next = frag->child = NULL;
-        frag->data = (uint8_t*) malloc(sizeof(uint8_t) * ip->length);
-        fprintf(stderr, "IPv6 fragment. offset: %d, m:%u\n", frag->start,
-                                                            frag->islast);
-        memcpy(frag->data, packet+pos, ip->length);
-        // Add the fragment to the list.
-        // If this completed the packet, it is returned.
-        frag = ip_frag_add(frag, ipFragmentHead); 
-        if (frag != NULL) {
-            header->len = ip->length = frag->end - frag->start;
-            *p_packet = frag->data;
-            free(frag);
-            return 0;
-        }
-        // Signals that there is no more work to do on this packet.
-        *p_packet = NULL;
-        return 0;
-    } else {
-        return pos;
-    }
-
-}
-
 /*********************************************************** INTERFACE ***************************************************************/
 
 void logInterface(string strInterface, string strLog, string strTime)
@@ -457,74 +218,94 @@ void logInterface(string strInterface, string strLog, string strTime)
 /*********************************************************** PCAP FILE ***************************************************************/
 
 // This method is called in pcap_loop for each packet
-void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *pkthdr, const uint8_t* origPacket)
+void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *orig_header, const uint8_t* orig_packet)
 {
-    LOGGING(cerr << "Handling packet " << packetCount++);
+    LOGGING("Handling packet " << packetCount++);
 
     int pos;
-    uint16_t ethType;
-    ipInfo ip;
+    uint16_t eth_type;
+    ip_info ip;
 
-    // The way we handle IP fragments means we may have to replace
-    // the original data and correct the header info, so a const won't work.
-    uint8_t* packet = (uint8_t*) origPacket;
+    uint8_t* packet = (uint8_t*) orig_packet;    // Const is useless
+
     struct pcap_pkthdr header;
-    header.ts = pkthdr->ts;
-    header.caplen = pkthdr->caplen;
-    header.len = pkthdr->len;
+    header.ts = orig_header->ts;
+    header.caplen = orig_header->caplen;
+    header.len = orig_header->len;
     
-    // Parse the ethernet frame. Errors are typically handled in the parser
-    // functions. The functions generally return 0 on error.
-    pos = ethParse(&header, packet, &ethType, datalink);
-    if (pos == 0) 
+    // Parse the ethernet frame
+    pos = ethParse(&header, packet, &eth_type, datalink);
+    if (pos == 0)
+    {
+        LOGGING("Truncated packet found when eth parsing. Skipping packet");
         return;
+    }
 
     // MPLS parsing is simple, but leaves us to guess the next protocol.
     // We make our guess in the MPLS parser, and set the ethtype accordingly.
-    if (ethType == 0x8847) {
-        pos = mplsParse(pos, &header, packet, &ethType);
+
+    // 0x8847 is MPLS unicast protocol
+    if (eth_type == 0x8847)
+    {
+        pos = mplsParse(pos, &header, packet, &eth_type);
+
+        if (pos == 0)
+        {
+            LOGGING("Truncated packet found when mpls parsing. Skipping packet");
+            return;
+        }
     }  
 
     // IP v4 and v6 parsing. These may replace the packet byte array with 
     // one from reconstructed packet fragments. Zero is a reasonable return
     // value, so they set the packet pointer to NULL on failure.
-    if (ethType == 0x0800) {
-        pos = ipv4Parse(pos, &header, &packet, &ip);
-    } else if (ethType == 0x86DD) {
-        pos = ipv6Parse(pos, &header, &packet, &ip);
-    } else {
-        fprintf(stderr, "Unsupported EtherType: %04x\n", ethType);
+    if (eth_type == 0x0800)
+    {
+        pos = ipv4Parse(pos, &header, packet, &ip);
+    }
+    else if (eth_type == 0x86DD)
+    {
+        pos = ipv6Parse(pos, &header, packet, &ip);
+    }
+    else
+    {
+        LOGGING("Unsupported EtherType: " << eth_type);
         return;
     }
-    if (packet == NULL) return;
 
-        // Transport layer parsing. 
-    if (ip.proto == 17) {
-        // Parse the udp and this single bit of DNS, and output it.
+    if (packet == NULL)
+    {
+        return;
+    }
+
+    // Transport layer parsing
+    if (ip.proto == 17)
+    {
+        // Parse the udp and this single bit of DNS, and output it
         dns_info dns;
         transport_info udp;
         pos = udpParse(pos, &header, packet, &udp);
-        if ( pos == 0 ) return;
-        // Only do deduplication if DEDUPS > 0.
-        // if (conf->DEDUPS != 0 ) {
-        //     if (dedup(pos, &header, packet, &ip, &udp, conf) == 1) {
-        //         // A duplicate packet.
-        //         return;
-        //     }
-        // }
 
-        pos = dns_parse(pos, &header, packet, &dns, !FORCE);
+        if (pos == 0)
+        {
+            return;
+        }
 
+        pos = dnsParse(pos, &header, packet, &dns, !FORCE);
         printSummary(&ip, &udp, &dns, &header);
-    } else if (ip.proto == 6) {
+    }
+    else if (ip.proto == 6)
+    {
         // Hand the tcp packet over for later reconstruction.
-        //tcp_parse(pos, &header, packet, &ip, conf); 
-    } else {
+        // tcp_parse(pos, &header, packet, &ip, conf); 
+    }
+    else
+    {
         fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
         return;
     }
    
-    if (packet != origPacket) {
+    if (packet != orig_packet) {
         // Free data from artificially constructed packets.
         free(packet);
     }
@@ -532,11 +313,12 @@ void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *pkthdr, const
     // Expire tcp sessions, and output them if possible.
     fprintf(stderr, "Expiring TCP.\n");
     //tcp_expire(conf, &header.ts);
+    cout << "//////////////////////////////////////////////\n\n";
 }
 
 void logFile(string strFile, string strLog)
 {
-    LOGGING(cerr << "Logging from file");
+    LOGGING("Logging from file");
 
     char errBuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcapFile;
@@ -584,3 +366,70 @@ int main(int argc, char const *argv[])
 
     return 0;
 }
+
+
+
+
+
+
+
+// Output the DNS data.
+void printSummary(ip_info * ip, transport_info * trns, dns_info * dns,
+                   struct pcap_pkthdr * header) {
+    char proto;
+
+    uint32_t dnslength;
+    dns_question *qnext;
+
+    print_ts(&(header->ts));
+
+    // Print the transport protocol indicator.
+    if (ip->proto == 17) {
+        proto = 'u';
+    } else if (ip->proto == 6) {
+        proto = 't';
+    } else {
+        return;
+    }
+    dnslength = trns->length;
+
+    // Print the IP addresses and the basic query information.
+    printf(",%s,", iptostr(&ip->src));
+    printf("%s,%d,%c,%c,%s", iptostr(&ip->dst),
+           dnslength, proto, dns->qr ? 'r':'q', dns->AA?"AA":"NA");
+
+    // if (conf->COUNTS) {
+    //     printf(",%u?,%u!,%u$,%u+", dns->qdcount, dns->ancount, 
+    //                                dns->nscount, dns->arcount);
+    // }
+
+    // Go through the list of queries, and print each one.
+    qnext = dns->queries;
+    while (qnext != NULL) {
+        printf("%c? ", '\t');
+            rr_parser_container * parser; 
+            parser = findParser(qnext->cls, qnext->type);
+            if (parser->name == NULL) 
+                printf("%s UNKNOWN(%s,%d)", qnext->name, parser->name, qnext->type);
+            else 
+                printf("%s %s", qnext->name, parser->name);
+        
+        qnext = qnext->next; 
+    }
+
+    // Print it resource record type in turn (for those enabled).
+    printRRSection(dns->answers, "!");
+    // if (conf->NS_ENABLED) 
+    //     printRRSection(dns->name_servers, "$");
+    // if (conf->AD_ENABLED) 
+    //     printRRSection(dns->additional, "+");
+    //printf("%c%s\n", conf->SEP, conf->RECORD_SEP);
+    
+    dns_question_free(dns->queries);
+    dns_rr_free(dns->answers);
+    dns_rr_free(dns->name_servers);
+    dns_rr_free(dns->additional);
+    fflush(stdout); 
+    fflush(stderr);
+}
+
