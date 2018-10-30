@@ -14,6 +14,13 @@ const string help = "Invalid parameters!\n\n"
 
 #define FORCE 1
 
+// EtherType values for some notable protocols
+// https://en.wikipedia.org/wiki/EtherType
+#define VLAN_TAGGED 0x8100
+#define MPLS_UNI 0x8847
+#define IPv4Prot 0x0800
+#define IPv6Prot 0x86DD
+
 #define IPv4 0x04
 #define IPv6 0x06
 
@@ -27,16 +34,20 @@ const string help = "Invalid parameters!\n\n"
 
 static const char cb64[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+const string red("\033[0;31m");
+const string yellow("\033[1;33m");
+const string reset("\033[0m");
+
 
 /***************************************** MACROS ********************************/
 
 #define ERR_RET(message)     \
-    cerr << message << " Terminating." << endl; \
+    cerr << red << message << " Terminating." << reset << endl; \
     exit(EXIT_FAILURE);
 
 #define LOGGING(message) \
-    cerr << "LOG: " <<   \
-    message << endl;
+    cerr << yellow << "LOG: " <<   \
+    message << reset << endl;
 
 // Move IPv4 addr at pointer P into ip object D, and set it's type.
 #define IPv4_MOVE(D, P) D.addr.v4.s_addr = *(in_addr_t*)(P); \
@@ -70,49 +81,49 @@ typedef struct
     string interface;
     string syslogServer;
     string time;
-} raw_parameters;
+} rawParameters;
 
 /////////////////////////////////////////////////////////////////
 
 // IP address container that is IP version agnostic.
 // The IPvX_MOVE macros handle filling these with packet data correctly.
-typedef struct ip_addr {
+typedef struct ipAddr {
     // Should always be either 4 or 6.
     uint8_t vers;
     union {
         struct in_addr v4;
         struct in6_addr v6;
     } addr;
-} ip_addr;
+} ipAddr;
 
 // Basic network layer information.
 typedef struct {
-    ip_addr src;
-    ip_addr dst;
+    ipAddr src;
+    ipAddr dst;
     uint32_t length;
     uint8_t proto;
-} ip_info;
+} ipInfo;
 
 // Holds the information for a dns question.
-typedef struct dns_question {
+typedef struct dnsQuestion {
     char * name;
     uint16_t type;
     uint16_t cls;
-    struct dns_question * next;
-} dns_question;
+    struct dnsQuestion * next;
+} dnsQuestion;
 
 // Holds the information for a dns resource record.
-typedef struct dns_rr {
+typedef struct dnsRR {
     char * name;
     uint16_t type;
     uint16_t cls;
-    const char * rr_name;
+    const char * rrName;
     uint16_t ttl;
     uint16_t rdlength;
-    uint16_t data_len;
+    uint16_t dataLen;
     char * data;
-    struct dns_rr * next;
-} dns_rr;
+    struct dnsRR * next;
+} dnsRR;
 
 // Holds general DNS information.
 typedef struct {
@@ -123,26 +134,26 @@ typedef struct {
     uint8_t rcode;
     uint8_t opcode;
     uint16_t qdcount;
-    dns_question * queries;
+    dnsQuestion * queries;
     uint16_t ancount;
-    dns_rr * answers;
+    dnsRR * answers;
     uint16_t nscount;
-    dns_rr * name_servers;
+    dnsRR * nameServers;
     uint16_t arcount;
-    dns_rr * additional;
-} dns_info;
+    dnsRR * additional;
+} dnsInfo;
 
 // TCP header information. Also contains pointers used to connect to this
 // to other TCP streams, and to connect this packet to other packets in
 // it's stream.
-typedef struct tcp_info {
+typedef struct tcpInfo {
     struct timeval ts;
-    ip_addr src;
-    ip_addr dst;
+    ipAddr src;
+    ipAddr dst;
     uint16_t srcport;
     uint16_t dstport;
     uint32_t sequence;
-    uint32_t ack_num;
+    uint32_t ackNum;
     // The length of the data portion.
     uint32_t len;
     uint8_t syn;
@@ -151,38 +162,25 @@ typedef struct tcp_info {
     uint8_t rst;
     uint8_t * data;
     // The next item in the list of tcp sessions.
-    struct tcp_info * next_sess;
+    struct tcpInfo * nextSess;
     // These are for connecting all the packets in a session. The session
     // pointers above will always point to the most recent packet.
-    // next_pkt and prev_pkt make chronological sense (next_pkt is always 
-    // more recent, and prev_pkt is less), we just hold the chain by the tail.
-    struct tcp_info * next_pkt;
-    struct tcp_info * prev_pkt;
-} tcp_info;
+    // nextPkt and prevPkt make chronological sense (nextPkt is always 
+    // more recent, and prevPkt is less), we just hold the chain by the tail.
+    struct tcpInfo * nextPkt;
+    struct tcpInfo * prevPkt;
+} tcpInfo;
 
-typedef char * rr_data_parser(const uint8_t*, uint32_t, uint32_t, uint16_t, uint32_t);
+typedef char * rrDataParser(const uint8_t*, uint32_t, uint32_t, uint16_t, uint32_t);
 
 typedef struct {
     uint16_t cls;
     uint16_t rtype;
-    rr_data_parser * parser;
+    rrDataParser * parser;
     const char * name;
     const char * doc;
     unsigned long long count;
-} rr_parser_container;
-
-// IP fragment information.
-typedef struct ip_fragment {
-    uint32_t id;
-    ip_addr src;
-    ip_addr dst;
-    uint32_t start;
-    uint32_t end;
-    uint8_t * data;
-    uint8_t islast; 
-    struct ip_fragment * next;
-    struct ip_fragment * child; 
-} ip_fragment;
+} rrParserContainer;
 
 // Transport information.
 typedef struct {
@@ -191,6 +189,6 @@ typedef struct {
     // Length of the payload.
     uint16_t length;
     uint8_t transport; 
-} transport_info;
+} transportInfo;
 
 #endif

@@ -15,6 +15,6 @@
 using namespace std;
 
 /******************************************************** CONST & MACROS *******************************************************/
-void printSummary(ip_info*, transport_info *, dns_info *,
+void printSummary(ipInfo*, transportInfo *, dnsInfo *,
                    struct pcap_pkthdr *);
 #endif

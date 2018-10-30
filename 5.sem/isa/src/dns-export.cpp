@@ -10,8 +10,8 @@
 #include "parsers.cpp"
 
 using namespace std;
-int packetCount = 0;
-int datalink;
+uint32_t packetCount = 0;
+uint32_t datalink;
 
 
 
@@ -20,7 +20,7 @@ int datalink;
 class DnsRecord
 {
 	string domain;
-	int rrType;
+	uint32_t rrType;
 	string rrAnswer;
 	uint count;
 
@@ -70,12 +70,12 @@ class DnsRecord
             default:
                 return "Unknown";
         }
-}
+    }
         
 
     public:
 
-        DnsRecord(string d, int rt, string ra, int c)
+        DnsRecord(string d, uint32_t rt, string ra, uint32_t c)
         {
             domain = d;
             rrType = rt;
@@ -139,9 +139,9 @@ void handleSig(int sigNum)
 }
 
 // Argument parser
-raw_parameters parseArg(int argc, char const *argv[])
+rawParameters parseArg(int argc, char const *argv[])
 {
-    raw_parameters params;
+    rawParameters params;
     params.file = params.interface = params.syslogServer = params.time = "";
     int option;
 
@@ -218,38 +218,37 @@ void logInterface(string strInterface, string strLog, string strTime)
 /*********************************************************** PCAP FILE ***************************************************************/
 
 // This method is called in pcap_loop for each packet
-void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *orig_header, const uint8_t* orig_packet)
+void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, const uint8_t* origPacket)
 {
     LOGGING("Handling packet " << packetCount++);
 
-    int pos;
-    uint16_t eth_type;
-    ip_info ip;
+    uint32_t currentPos;
+    uint16_t ethType;
+    ipInfo ip;
 
-    uint8_t* packet = (uint8_t*) orig_packet;    // Const is useless
+    uint8_t* packet = (uint8_t*) origPacket;    // Const is useless
 
     struct pcap_pkthdr header;
-    header.ts = orig_header->ts;
-    header.caplen = orig_header->caplen;
-    header.len = orig_header->len;
+    header.ts = origHeader->ts;
+    header.caplen = origHeader->caplen;
+    header.len = origHeader->len;
     
-    // Parse the ethernet frame
-    pos = ethParse(&header, packet, &eth_type, datalink);
-    if (pos == 0)
+    // Parse ethernet frame
+    currentPos = ethParse(&header, packet, &ethType, datalink);
+    if (currentPos == 0)
     {
-        LOGGING("Truncated packet found when eth parsing. Skipping packet");
+        LOGGING("Truncated packet found when ethernet header parsing. Skipping packet");
         return;
     }
 
     // MPLS parsing is simple, but leaves us to guess the next protocol.
     // We make our guess in the MPLS parser, and set the ethtype accordingly.
 
-    // 0x8847 is MPLS unicast protocol
-    if (eth_type == 0x8847)
+    if (ethType == MPLS_UNI)
     {
-        pos = mplsParse(pos, &header, packet, &eth_type);
+        currentPos = mplsParse(&header, packet, &ethType, currentPos);
 
-        if (pos == 0)
+        if (currentPos == 0)
         {
             LOGGING("Truncated packet found when mpls parsing. Skipping packet");
             return;
@@ -259,45 +258,46 @@ void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *orig_header, 
     // IP v4 and v6 parsing. These may replace the packet byte array with 
     // one from reconstructed packet fragments. Zero is a reasonable return
     // value, so they set the packet pointer to NULL on failure.
-    if (eth_type == 0x0800)
+    if (ethType == IPv4Prot)
     {
-        pos = ipv4Parse(pos, &header, packet, &ip);
+        currentPos = ipv4Parse(currentPos, &header, packet, &ip);
     }
-    else if (eth_type == 0x86DD)
+    else if (ethType == 0x86DD)
     {
-        pos = ipv6Parse(pos, &header, packet, &ip);
+        currentPos = ipv6Parse(currentPos, &header, packet, &ip);
     }
     else
     {
-        LOGGING("Unsupported EtherType: " << eth_type);
+        LOGGING("Unsupported EtherType: " << ethType);
         return;
     }
 
-    if (packet == NULL)
+    // Fragmented or truncated packet
+    if (currentPos == 0)
     {
         return;
     }
 
     // Transport layer parsing
-    if (ip.proto == 17)
+    if (ip.proto == UDP)
     {
         // Parse the udp and this single bit of DNS, and output it
-        dns_info dns;
-        transport_info udp;
-        pos = udpParse(pos, &header, packet, &udp);
+        transportInfo udp;
+        currentPos = udpParse(currentPos, &header, packet, &udp);
 
-        if (pos == 0)
+        if (currentPos == 0)
         {
             return;
         }
 
-        pos = dnsParse(pos, &header, packet, &dns, !FORCE);
+        dnsInfo dns;
+        currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
         printSummary(&ip, &udp, &dns, &header);
     }
-    else if (ip.proto == 6)
+    else if (ip.proto == TCP)
     {
         // Hand the tcp packet over for later reconstruction.
-        // tcp_parse(pos, &header, packet, &ip, conf); 
+        // tcp_parse(currentPos, &header, packet, &ip, conf); 
     }
     else
     {
@@ -305,7 +305,7 @@ void pcapHandler(unsigned char *useless, const struct pcap_pkthdr *orig_header, 
         return;
     }
    
-    if (packet != orig_packet) {
+    if (packet != origPacket) {
         // Free data from artificially constructed packets.
         free(packet);
     }
@@ -334,8 +334,8 @@ void logFile(string strFile, string strLog)
 
     datalink = pcap_datalink(pcapFile);
 
-    int ret2 = pcap_compile(pcapFile, &fp, str_filter.c_str(), 0, 0xffffffff); // create the filter
-    int ret3 = pcap_setfilter(pcapFile, &fp);                                  // attach the filter to the handle
+    uint32_t ret2 = pcap_compile(pcapFile, &fp, str_filter.c_str(), 0, 0xffffffff); // create the filter
+    uint32_t ret3 = pcap_setfilter(pcapFile, &fp);                                  // attach the filter to the handle
 
     if (pcap_loop(pcapFile, -1, pcapHandler, NULL) < 0)
     {
@@ -348,11 +348,11 @@ void logFile(string strFile, string strLog)
 // Main function
 int main(int argc, char const *argv[])
 {
-    // Handle SIUSR1
+    // Handle SIUGSR1
     signal(SIGUSR1, handleSig);
 
     // Parse arguments
-    raw_parameters params = parseArg(argc, argv);
+    rawParameters params = parseArg(argc, argv);
 
     if (params.interface.compare(""))
     {
@@ -368,18 +368,13 @@ int main(int argc, char const *argv[])
 }
 
 
-
-
-
-
-
 // Output the DNS data.
-void printSummary(ip_info * ip, transport_info * trns, dns_info * dns,
+void printSummary(ipInfo * ip, transportInfo * trns, dnsInfo * dns,
                    struct pcap_pkthdr * header) {
     char proto;
 
     uint32_t dnslength;
-    dns_question *qnext;
+    dnsQuestion *qnext;
 
     print_ts(&(header->ts));
 
@@ -407,7 +402,7 @@ void printSummary(ip_info * ip, transport_info * trns, dns_info * dns,
     qnext = dns->queries;
     while (qnext != NULL) {
         printf("%c? ", '\t');
-            rr_parser_container * parser; 
+            rrParserContainer * parser; 
             parser = findParser(qnext->cls, qnext->type);
             if (parser->name == NULL) 
                 printf("%s UNKNOWN(%s,%d)", qnext->name, parser->name, qnext->type);
@@ -420,15 +415,15 @@ void printSummary(ip_info * ip, transport_info * trns, dns_info * dns,
     // Print it resource record type in turn (for those enabled).
     printRRSection(dns->answers, "!");
     // if (conf->NS_ENABLED) 
-    //     printRRSection(dns->name_servers, "$");
+    //     printRRSection(dns->nameServers, "$");
     // if (conf->AD_ENABLED) 
     //     printRRSection(dns->additional, "+");
     //printf("%c%s\n", conf->SEP, conf->RECORD_SEP);
     
-    dns_question_free(dns->queries);
-    dns_rr_free(dns->answers);
-    dns_rr_free(dns->name_servers);
-    dns_rr_free(dns->additional);
+    dnsQuestion_free(dns->queries);
+    dnsRR_free(dns->answers);
+    dnsRR_free(dns->nameServers);
+    dnsRR_free(dns->additional);
     fflush(stdout); 
     fflush(stderr);
 }
