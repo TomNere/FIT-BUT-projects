@@ -3,16 +3,10 @@
 
 #include "structures.h"
 
-uint32_t ethParse(struct pcap_pkthdr*, uint8_t*, uint16_t*, int);
-uint32_t mplsParse(struct pcap_pkthdr*, uint8_t*, uint16_t*, uint32_t);
-
 // The ** to the packet data is passed, instead of the data directly.
 // They may set the packet pointer to a new data array.
 // On error, the packet pointer is set to NULL.
-uint32_t ipv4Parse(uint32_t, struct pcap_pkthdr*, uint8_t**, ipInfo*);
 uint32_t ipv6Parse(uint32_t, struct pcap_pkthdr*, uint8_t**, ipInfo*);
-
-uint32_t udpParse(uint32_t, struct pcap_pkthdr*, uint8_t*, transportInfo*);
 
 uint32_t dnsParse(uint32_t, struct pcap_pkthdr*, uint8_t*, dnsInfo*, uint8_t);
 

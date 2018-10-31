@@ -7,6 +7,20 @@
 #include <list>
 #include <iterator>
 #include <sstream>
+
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+#include <arpa/inet.h>
+#include <netinet/if_ether.h> 
+#include <err.h>
+
+#ifdef __linux__            // for Linux
+#include <netinet/ether.h> 
+#include <time.h>
+#endif
+
 #include "parsers.cpp"
 
 using namespace std;
@@ -222,88 +236,91 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
 {
     LOGGING("Handling packet " << packetCount++);
 
-    uint32_t currentPos;
+    uint32_t currentPos = 0;
     uint16_t ethType;
     ipInfo ip;
 
     uint8_t* packet = (uint8_t*) origPacket;    // Const is useless
+
+    struct ether_header *eptr;
+    struct ip* myIp;
+    u_int sizeIp;
+    const struct tcphdr *myTcp;    // pointer to the beginning of TCP header
+    const struct udphdr *myUdp;    // pointer to the beginning of UDP header
+
 
     struct pcap_pkthdr header;
     header.ts = origHeader->ts;
     header.caplen = origHeader->caplen;
     header.len = origHeader->len;
     
-    // Parse ethernet frame
-    currentPos = ethParse(&header, packet, &ethType, datalink);
-    if (currentPos == 0)
-    {
-        LOGGING("Truncated packet found when ethernet header parsing. Skipping packet");
-        return;
-    }
+    // read the Ethernet header
+    eptr = (struct ether_header*) packet;
+    currentPos += sizeof(struct ether_header);
 
-    // MPLS parsing is simple, but leaves us to guess the next protocol.
-    // We make our guess in the MPLS parser, and set the ethtype accordingly.
+    switch (ntohs(eptr->ether_type))
+    {               
+        // see /usr/include/net/ethernet.h for types
+        case ETHERTYPE_IP:                  // IPv4 packet
+            // printf("\tEthernet type is  0x%x, i.e. IP packet \n", ntohs(eptr->ether_type));
+            myIp = (struct ip*) (packet + currentPos);        // skip Ethernet header
+            currentPos += sizeof(struct ip);
 
-    if (ethType == MPLS_UNI)
-    {
-        currentPos = mplsParse(&header, packet, &ethType, currentPos);
+            switch (myIp->ip_p)
+            {
+                case TCP: 
+	                LOGGING("protocol TCP");
+	                myTcp = (struct tcphdr*) (packet + currentPos); // pointer to the TCP header
+	                break;
+                case UDP: 
+	                LOGGING("protocol UDP");
+	                myUdp = (struct udphdr*) (packet + currentPos); // pointer to the UDP header
+                    currentPos += sizeof(struct udphdr);
 
-        if (currentPos == 0)
-        {
-            LOGGING("Truncated packet found when mpls parsing. Skipping packet");
-            return;
-        }
-    }  
+                    dnsInfo dns;
+                    currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
+                    printSummary(&ip, &dns, &header);
+	                break;
+                default: 
+	                printf("Invalid protocol for DNS");
+            }
+            break;
+        case ETHERTYPE_IPV6:  // IPv6
+            printf("\tEthernet type is 0x%x, i.e., IPv6 packet\n",ntohs(eptr->ether_type));
+            break;
+        case ETHERTYPE_ARP:  // ARP
+             printf("\tEthernet type is 0x%x, i.e., ARP packet\n",ntohs(eptr->ether_type));
+            break;
+        default:
+            printf("\tEthernet type 0x%x, not IPv4\n", ntohs(eptr->ether_type));
+    } 
+    
+    // else if (ethType == 0x86DD)
+    // {
+    //     currentPos = ipv6Parse(currentPos, &header, packet, &ip);
+    // }
+    // else
+    // {
+    //     LOGGING("Unsupported EtherType: " << ethType);
+    //     return;
+    // }
 
-    // IP v4 and v6 parsing. These may replace the packet byte array with 
-    // one from reconstructed packet fragments. Zero is a reasonable return
-    // value, so they set the packet pointer to NULL on failure.
-    if (ethType == IPv4Prot)
-    {
-        currentPos = ipv4Parse(currentPos, &header, packet, &ip);
-    }
-    else if (ethType == 0x86DD)
-    {
-        currentPos = ipv6Parse(currentPos, &header, packet, &ip);
-    }
-    else
-    {
-        LOGGING("Unsupported EtherType: " << ethType);
-        return;
-    }
+    // // Fragmented or truncated packet
+    // if (currentPos == 0)
+    // {
+    //     return;
+    // }
 
-    // Fragmented or truncated packet
-    if (currentPos == 0)
-    {
-        return;
-    }
-
-    // Transport layer parsing
-    if (ip.proto == UDP)
-    {
-        // Parse the udp and this single bit of DNS, and output it
-        transportInfo udp;
-        currentPos = udpParse(currentPos, &header, packet, &udp);
-
-        if (currentPos == 0)
-        {
-            return;
-        }
-
-        dnsInfo dns;
-        currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
-        printSummary(&ip, &udp, &dns, &header);
-    }
-    else if (ip.proto == TCP)
-    {
-        // Hand the tcp packet over for later reconstruction.
-        // tcp_parse(currentPos, &header, packet, &ip, conf); 
-    }
-    else
-    {
-        fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
-        return;
-    }
+    // else if (ip.proto == TCP)
+    // {
+    //     // Hand the tcp packet over for later reconstruction.
+    //     // tcp_parse(currentPos, &header, packet, &ip, conf); 
+    // }
+    // else
+    // {
+    //     fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
+    //     return;
+    // }
    
     if (packet != origPacket) {
         // Free data from artificially constructed packets.
@@ -369,8 +386,8 @@ int main(int argc, char const *argv[])
 
 
 // Output the DNS data.
-void printSummary(ipInfo * ip, transportInfo * trns, dnsInfo * dns,
-                   struct pcap_pkthdr * header) {
+void printSummary(ipInfo* ip, dnsInfo* dns, struct pcap_pkthdr * header) {
+    LOGGING("Printing summary");
     char proto;
 
     uint32_t dnslength;
@@ -379,14 +396,14 @@ void printSummary(ipInfo * ip, transportInfo * trns, dnsInfo * dns,
     print_ts(&(header->ts));
 
     // Print the transport protocol indicator.
-    if (ip->proto == 17) {
-        proto = 'u';
-    } else if (ip->proto == 6) {
-        proto = 't';
-    } else {
-        return;
-    }
-    dnslength = trns->length;
+    // if (ip->proto == 17) {
+    //     proto = 'u';
+    // } else if (ip->proto == 6) {
+    //     proto = 't';
+    // } else {
+    //     return;
+    // }
+    //dnslength = trns->length;
 
     // Print the IP addresses and the basic query information.
     printf(",%s,", iptostr(&ip->src));
@@ -401,6 +418,7 @@ void printSummary(ipInfo * ip, transportInfo * trns, dnsInfo * dns,
     // Go through the list of queries, and print each one.
     qnext = dns->queries;
     while (qnext != NULL) {
+        LOGGING("Query list");
         printf("%c? ", '\t');
             rrParserContainer * parser; 
             parser = findParser(qnext->cls, qnext->type);

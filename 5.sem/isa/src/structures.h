@@ -27,6 +27,8 @@ const string help = "Invalid parameters!\n\n"
 #define UDP 0x11
 #define TCP 0x06
 
+#define SIZE_ETHERNET (14)       // offset of Ethernet header to L3 protocol
+
 #define REORDER_LIMIT 100000
 
 #define NULL_DOC "This data is simply hex escaped. \n"\
