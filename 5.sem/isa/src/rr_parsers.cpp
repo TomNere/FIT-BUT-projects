@@ -4,7 +4,7 @@
 using namespace std;
 
 // This is for handling rr's with errors or an unhandled rtype.
-rrParserContainer default_rr_parser;
+rrParserContainer default_rr_parser = {0, 0, escape, NULL, NULL, 0};
 
 // Add them to the list of data parsers in rtypes.c.
 extern rrParserContainer rr_parsers[];
@@ -116,28 +116,6 @@ char * mx(const uint8_t * packet, uint32_t pos, uint32_t idPos,
     buffer = (char*)  malloc(sizeof(char)*(5 + 1 + strlen(name) + 1));
     sprintf(buffer, "%d,%s", pref, name);
     free(name);
-    return buffer;
-}
-
-#define OPTS_DOC "EDNS option record format\n"\
-"These records contain a size field for warning about extra large DNS \n"\
-"packets, an extended rcode, and an optional set of dynamic fields.\n"\
-"The size and extended rcode are printed, but the dynamic fields are \n"\
-"simply escaped. Note that the associated format function is non-standard,\n"\
-"as EDNS records modify the basic resourse record protocol (there is no \n"\
-"class field, for instance. RFC 2671"
-char * opts(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                  uint16_t rdlength, uint32_t plen) {
-    uint16_t payload_size = (packet[pos] << 8) + packet[pos+1];
-    char *buffer;
-    const char * base_format = "size:%d,rcode:0x%02x%02x%02x%02x,%s";
-    //char *rdata = escape_data(packet, pos+6, pos + 6 + rdlength);
-
-    // buffer = (char*) malloc(sizeof(char) * (strlen(base_format) - 20 + 5 + 8 +
-    //                                 strlen(rdata) + 1)); 
-    // sprintf(buffer, base_format, payload_size, packet[pos+2], packet[pos+3],
-    //                              packet[pos+4], packet[pos+5], rdata); 
-    // free(rdata);
     return buffer;
 }
 
@@ -274,7 +252,7 @@ rrParserContainer rr_parsers[] =
     {1, 28, AAAA, "AAAA", AAAA_DOC, 0},
     {0, 15, mx, "MX", MX_DOC, 0},
     {0, 46, rrsig, "RRSIG", RRSIG_DOC, 0},
-    {0, 16, domain_name, "TEXT", NULL_DOC, 0}, 
+    {0, 16, domain_name, "TXT", NULL_DOC, 0}, 
     {0, 47, nsec, "NSEC", NSEC_DOC, 0},
     {0, 43, ds, "DS", DS_DOC, 0},
     {0, 48, dnskey, "DNSKEY", KEY_DOC, 0}

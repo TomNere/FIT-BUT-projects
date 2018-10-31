@@ -254,7 +254,11 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
         case UDP:
             dnsInfo dns;
             currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
-            printSummary(&ip, &dns, &header);
+
+            if (currentPos != 0)
+            {
+                printSummary(&ip, &dns, &header);
+            }
         case TCP:
             // TODO
             LOGGING("TCP not implemented yet");
@@ -352,57 +356,13 @@ void printSummary(ipInfo* ip, dnsInfo* dns, struct pcap_pkthdr * header) {
     char proto;
 
     uint32_t dnslength;
-    dnsQuestion *qnext;
 
     print_ts(&(header->ts));
 
-    // Print the transport protocol indicator.
-    // if (ip->proto == 17) {
-    //     proto = 'u';
-    // } else if (ip->proto == 6) {
-    //     proto = 't';
-    // } else {
-    //     return;
-    // }
-    //dnslength = trns->length;
-
-    // Print the IP addresses and the basic query information.
-    printf(",%s,", iptostr(&ip->src));
-    printf("%s,%d,%c,%c,%s", iptostr(&ip->dst),
-           dnslength, proto, dns->qr ? 'r':'q', dns->AA?"AA":"NA");
-
-    // if (conf->COUNTS) {
-    //     printf(",%u?,%u!,%u$,%u+", dns->qdcount, dns->ancount, 
-    //                                dns->nscount, dns->arcount);
-    // }
-
-    // Go through the list of queries, and print each one.
-    qnext = dns->queries;
-    while (qnext != NULL) {
-        LOGGING("Query list");
-        printf("%c? ", '\t');
-            rrParserContainer * parser; 
-            parser = findParser(qnext->cls, qnext->type);
-            if (parser->name == NULL) 
-                printf("%s UNKNOWN(%s,%d)", qnext->name, parser->name, qnext->type);
-            else 
-                printf("%s %s", qnext->name, parser->name);
-        
-        qnext = qnext->next; 
-    }
-
     // Print it resource record type in turn (for those enabled).
     printRRSection(dns->answers, "!");
-    // if (conf->NS_ENABLED) 
-    //     printRRSection(dns->nameServers, "$");
-    // if (conf->AD_ENABLED) 
-    //     printRRSection(dns->additional, "+");
-    //printf("%c%s\n", conf->SEP, conf->RECORD_SEP);
     
-    dnsQuestion_free(dns->queries);
     dnsRR_free(dns->answers);
-    dnsRR_free(dns->nameServers);
-    dnsRR_free(dns->additional);
     fflush(stdout); 
     fflush(stderr);
 }

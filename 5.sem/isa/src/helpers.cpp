@@ -225,14 +225,6 @@ void printRRSection(dnsRR * next, char * name) {
     }
 }
 
-// Free a dnsQuestion struct.
-void dnsQuestion_free(dnsQuestion * question) {
-    if (question == NULL) return;
-    if (question->name != NULL) free(question->name);
-    dnsQuestion_free(question->next);
-    free(question);
-}
-
 // Free a dnsRR struct.
 void dnsRR_free(dnsRR * rr) {
     if (rr == NULL) return;

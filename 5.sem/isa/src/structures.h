@@ -106,14 +106,6 @@ typedef struct {
     uint8_t proto;
 } ipInfo;
 
-// Holds the information for a dns question.
-typedef struct dnsQuestion {
-    char * name;
-    uint16_t type;
-    uint16_t cls;
-    struct dnsQuestion * next;
-} dnsQuestion;
-
 // Holds the information for a dns resource record.
 typedef struct dnsRR {
     char * name;
@@ -135,14 +127,8 @@ typedef struct {
     char TC;
     uint8_t rcode;
     uint8_t opcode;
-    uint16_t qdcount;
-    dnsQuestion * queries;
     uint16_t ancount;
     dnsRR * answers;
-    uint16_t nscount;
-    dnsRR * nameServers;
-    uint16_t arcount;
-    dnsRR * additional;
 } dnsInfo;
 
 // TCP header information. Also contains pointers used to connect to this

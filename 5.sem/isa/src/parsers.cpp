@@ -81,102 +81,18 @@ uint32_t dnsParse(uint32_t pos, struct pcap_pkthdr* header, uint8_t* packet, dns
     // remaining fields. Parsing this would hurt more than help. 
     if (dns->rcode > 5) {
         LOGGING("Rcode > 5. Skipping");
-        return 0;;
+        return 0;
     }
 
     // Counts for each of the record types.
-    dns->qdcount = (packet[pos+4] << 8) + packet[pos+5];
+    int qdCount = (packet[pos+4] << 8) + packet[pos+5];
     dns->ancount = (packet[pos+6] << 8) + packet[pos+7];
-    dns->nscount = (packet[pos+8] << 8) + packet[pos+9];
-    dns->arcount = (packet[pos+10] << 8) + packet[pos+11];
 
-    // Parse each type of records in turn
-    pos = parseQuestions(pos + 12, idPos, header, packet, dns->qdcount, &(dns->queries));
+    // Skip questions
+    pos = pos + 12 + (qdCount * 4);
 
-    if (pos != 0)
-    {
-        pos = parseRRSet(pos, idPos, header, packet, dns->ancount, &(dns->answers));
-    }
-    else
-    {
-        dns->answers = NULL;
-    }
-
-    if (pos != 0 && force)
-    {
-        pos = parseRRSet(pos, idPos, header, packet, dns->nscount, &(dns->nameServers));
-    }
-    else
-    {
-        dns->nameServers = NULL;
-    }
-
-    if (pos != 0 && force)
-    {
-        pos = parseRRSet(pos, idPos, header, packet, dns->arcount, &(dns->additional));
-    }
-    else
-    {
-        dns->additional = NULL; 
-    }
-
-    return pos;
-}
-
-// Parse the questions section of the dns protocol
-// pos - offset to the start of the questions section
-// idPos - offset set to the id field. Needed to decompress dns data
-// packet, header - the packet location and header data
-// count - Number of question records to expect
-// root - Pointer to where to store the question records
-uint32_t parseQuestions(uint32_t pos, uint32_t idPos, struct pcap_pkthdr* header, uint8_t* packet, uint16_t count, dnsQuestion** root)
-{
-    uint32_t startPos = pos;
-    dnsQuestion* last = NULL;
-    dnsQuestion* current;
-    uint16_t i;
-    *root = NULL;
-
-    for (i = 0; i < count; i++)
-    {
-        current = (dnsQuestion*) malloc(sizeof(dnsQuestion));
-        current->next = NULL; 
-        current->name = NULL;
-
-        current->name = readRRName(packet, &pos, idPos, header->len);
-
-        if (current->name == NULL || (pos + 2) >= header->len)
-        {
-            // Handle a bad DNS name.
-            LOGGING("DNS question error. Skipping");
-            current->type = 0;
-            current->cls = 0;
-            if (last == NULL)
-            {
-                *root = current;
-            }
-            else 
-            {
-                last->next = current;
-            }
-            return 0;
-        }
-
-        current->type = (packet[pos] << 8) + packet[pos+1];
-        current->cls = (packet[pos+2] << 8) + packet[pos+3];
-
-        // Add this question object to the list.
-        if (last == NULL)
-        {
-            *root = current;
-        }
-        else 
-        {
-            last->next = current;
-        }
-        last = current;
-        pos = pos + 4;
-   }
+    // Parse answer records
+    pos = parseRRSet(pos, idPos, header, packet, dns->ancount, &(dns->answers));
 
     return pos;
 }
@@ -186,17 +102,12 @@ uint32_t parseQuestions(uint32_t pos, uint32_t idPos, struct pcap_pkthdr* header
 // compressed names. 'count' is the expected number of records of this type.
 // 'root' is where to assign the parsed list of objects.
 // Return 0 on error, the new 'pos' in the packet otherwise.
-uint32_t parseRRSet(uint32_t pos, uint32_t idPos, struct pcap_pkthdr *header, uint8_t *packet, uint16_t count, dnsRR** root)
+uint32_t parseRRSet(uint32_t pos, uint32_t idPos, struct pcap_pkthdr* header, uint8_t* packet, uint16_t count, list<dnsRR*>* dnsRRList)
 {
-    dnsRR* last = NULL;
-    dnsRR* current;
-    uint16_t i;
-    *root = NULL;
-
-    for (i = 0; i < count; i++)
+    for (int i = 0; i < count; i++)
     {
         // Create and clear the data in a new dnsRR object.
-        current = (dnsRR*) malloc(sizeof(dnsRR));
+        dnsRR* current = (dnsRR*) malloc(sizeof(dnsRR));
         current->next = NULL; 
         current->name = NULL; 
         current->data = NULL;
@@ -207,19 +118,10 @@ uint32_t parseRRSet(uint32_t pos, uint32_t idPos, struct pcap_pkthdr *header, ui
         // we can only return what we've got and give up.
         if (pos == 0)
         {
-            if (last == NULL) *root = current;
-            else last->next = current;
+            LOGGING("Error occured when RR parsing")
             return 0;
         }
-        if (last == NULL) 
-        {
-            *root = current;
-        }
-        else 
-        {
-            last->next = current;
-        }
-        last = current;
+        (*dnsRRList).push_front(current);
     }
     return pos;
 }
@@ -231,7 +133,7 @@ uint32_t parseRR(uint32_t pos, uint32_t idPos, struct pcap_pkthdr* header, uint8
 {
     int i;
     uint32_t rr_start = pos;
-    rrParserContainer * parser;
+    rrParserContainer* parser;
     rrParserContainer opts_cont = {0,0, opts};
 
     rr->name = NULL;
