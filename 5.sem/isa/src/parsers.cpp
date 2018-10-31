@@ -8,122 +8,54 @@ rrDataParser opts;
 
 ////////////////////////////////////////////////////////////////
 
-// Parse the IPv6 header. May point p_packet to a new packet data array,
-// which means zero is a valid return value. Sets p_packet to NULL on error.
-// See RFC2460
-uint32_t ipv6Parse(uint32_t pos, struct pcap_pkthdr* header, uint8_t* packet, ipInfo* ip)
+uint32_t getTransProt(uint32_t* currentPos, const uint8_t* packet)
 {
-    // In case the IP packet is a fragment.
-    uint32_t header_len = 0;
+    struct ether_header *eptr;
+    struct ip* myIp;
+    struct ip6_hdr* myIpv6;
 
-    if (header->len < (pos + 40))
-    {
-        LOGGING("Truncated Packet(ipv6). Skipping");
-        return 0;
+    // read the Ethernet header
+    eptr = (struct ether_header*) packet;
+    *currentPos += sizeof(struct ether_header);
+
+    int protType;
+
+    // parse ethernet type 
+    switch (ntohs(eptr->ether_type))
+    {               
+        // see /usr/include/net/ethernet.h for types
+        case ETHERTYPE_IP:
+            LOGGING("Ethernet type is IPv4");
+            myIp = (struct ip*) (packet + *currentPos);              // skip Ethernet header
+            *currentPos += sizeof(struct ip);
+            protType = myIp->ip_p;
+            break;
+
+        case ETHERTYPE_IPV6:
+            LOGGING("Ethernet type is IPv6");
+            myIpv6 = (struct ip6_hdr*) (packet + *currentPos);
+            *currentPos += sizeof(struct ip6_hdr);
+            protType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+            break;
+        default:
+            LOGGING("Invalid ethernet type for DNS");
+            return 0;
     }
 
-    ip->length = (packet[pos+4] << 8) + packet[pos+5];
-
-    IPv6_MOVE(ip->src, packet + pos + 8);
-    IPv6_MOVE(ip->dst, packet + pos + 24);
-
-    // Jumbo grams will have a length of zero. We'll choose to ignore those,
-    // and any other zero length packets.
-    if (ip->length == 0)
+    switch (protType)
     {
-        LOGGING("Zero Length IP packet, possible Jumbo Payload. Skipping.");
-        return 0;
+        case UDP:
+            LOGGING("Transport protocol UDP");
+            *currentPos += sizeof(struct udphdr);
+            return UDP;
+        case TCP: 
+            LOGGING("Transport protocol TCP");
+            *currentPos += sizeof(struct tcphdr);
+            return TCP;
+        default: 
+            LOGGING("Invalid transport protocol for DNS");
+            return 0;
     }
-
-    uint8_t next_hdr = packet[pos+6];
-    pos += 40;
-   
-    // We pretty much have no choice but to parse all extended sections,
-    // since there is nothing to tell where the actual data is.
-    bool done = false;
-
-    while (done == false)
-    {
-        LOGGING("IPv6, next header: " << next_hdr);
-        switch (next_hdr)
-        {
-            // Handle hop-by-hop, dest, and routing options.
-            // Yay for consistent layouts.
-            case IPPROTO_HOPOPTS:
-            case IPPROTO_DSTOPTS:
-            case IPPROTO_ROUTING:
-                if (header->len < (pos + 16))
-                {
-                    LOGGING("Truncated Packet(ipv6). Skipping");
-                    return 0;
-                }
-
-                next_hdr = packet[pos];
-                // The headers are 16 bytes longer.
-                header_len += 16;
-                pos += packet[pos+1] + 1;
-                break;
-            case 51: // Authentication Header. See RFC4302
-                if (header->len < (pos + 2))
-                {
-                    LOGGING("Truncated Packet(ipv6). Skipping");
-                    return 0;
-                }
-
-                next_hdr = packet[pos];
-                header_len += (packet[pos+1] + 2) * 4;
-                pos += (packet[pos+1] + 2) * 4;
-
-                if (header->len < pos)
-                {
-                    LOGGING("Truncated Packet(ipv6). Skipping");
-                    return 0;
-                } 
-                break;
-            case 50: // ESP Protocol. See RFC4303.
-                // We don't support ESP.
-                LOGGING("Unsuported ESP protocol. Skipping");
-                return 0;
-            case 135: // IPv6 Mobility See RFC 6275
-                if (header->len < (pos + 2))
-                {
-                    LOGGING("Truncated Packet(ipv6). Skipping");
-                    return 0;
-                }  
-
-                next_hdr = packet[pos];
-                header_len += packet[pos+1] * 8;
-                pos += packet[pos+1] * 8;
-                if (header->len < pos)
-                {
-                    LOGGING("Truncated Packet(ipv6). Skipping");
-                    return 0;
-                } 
-                break;
-            case IPPROTO_FRAGMENT:
-                // IP fragment, skipping
-                return 0;
-            case TCP:
-            case UDP:
-                done = true; 
-                break;
-            default:
-                LOGGING("Unsupported IPv6 proto: " << next_hdr);
-                return 0;
-        }
-    }
-
-    // check for int overflow
-    if (header_len > ip->length)
-    {
-        LOGGING("Malformed packet(ipv6). Skipping");
-        return 0;
-    }
-
-    ip->proto = next_hdr;
-    ip->length = ip->length - header_len;
-
-    return pos;
 }
 
 // Parse the dns protocol in 'packet'

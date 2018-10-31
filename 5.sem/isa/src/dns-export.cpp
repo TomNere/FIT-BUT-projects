@@ -10,6 +10,7 @@
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
@@ -237,63 +238,30 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     LOGGING("Handling packet " << packetCount++);
 
     uint32_t currentPos = 0;
-    uint16_t ethType;
     ipInfo ip;
 
     uint8_t* packet = (uint8_t*) origPacket;    // Const is useless
-
-    struct ether_header *eptr;
-    struct ip* myIp;
-    u_int sizeIp;
-    const struct tcphdr *myTcp;    // pointer to the beginning of TCP header
-    const struct udphdr *myUdp;    // pointer to the beginning of UDP header
-
 
     struct pcap_pkthdr header;
     header.ts = origHeader->ts;
     header.caplen = origHeader->caplen;
     header.len = origHeader->len;
     
-    // read the Ethernet header
-    eptr = (struct ether_header*) packet;
-    currentPos += sizeof(struct ether_header);
+    int protType = getTransProt(&currentPos, packet);
 
-    switch (ntohs(eptr->ether_type))
-    {               
-        // see /usr/include/net/ethernet.h for types
-        case ETHERTYPE_IP:                  // IPv4 packet
-            // printf("\tEthernet type is  0x%x, i.e. IP packet \n", ntohs(eptr->ether_type));
-            myIp = (struct ip*) (packet + currentPos);        // skip Ethernet header
-            currentPos += sizeof(struct ip);
-
-            switch (myIp->ip_p)
-            {
-                case TCP: 
-	                LOGGING("protocol TCP");
-	                myTcp = (struct tcphdr*) (packet + currentPos); // pointer to the TCP header
-	                break;
-                case UDP: 
-	                LOGGING("protocol UDP");
-	                myUdp = (struct udphdr*) (packet + currentPos); // pointer to the UDP header
-                    currentPos += sizeof(struct udphdr);
-
-                    dnsInfo dns;
-                    currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
-                    printSummary(&ip, &dns, &header);
-	                break;
-                default: 
-	                printf("Invalid protocol for DNS");
-            }
-            break;
-        case ETHERTYPE_IPV6:  // IPv6
-            printf("\tEthernet type is 0x%x, i.e., IPv6 packet\n",ntohs(eptr->ether_type));
-            break;
-        case ETHERTYPE_ARP:  // ARP
-             printf("\tEthernet type is 0x%x, i.e., ARP packet\n",ntohs(eptr->ether_type));
-            break;
+    switch (protType)
+    {
+        case UDP:
+            dnsInfo dns;
+            currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
+            printSummary(&ip, &dns, &header);
+        case TCP:
+            // TODO
+            LOGGING("TCP not implemented yet");
         default:
-            printf("\tEthernet type 0x%x, not IPv4\n", ntohs(eptr->ether_type));
-    } 
+            return;
+    }
+    
     
     // else if (ethType == 0x86DD)
     // {
@@ -339,10 +307,6 @@ void logFile(string strFile, string strLog)
 
     char errBuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcapFile;
-    string str_filter = "udp port 53";
-    struct bpf_program fp; /* compiled filter program (expression) */
-    bpf_u_int32 mask;      /* subnet mask */
-    bpf_u_int32 net;       /* ip */
 
     if ((pcapFile = pcap_open_offline(strFile.c_str(), errBuf)) == NULL)
     {
@@ -350,9 +314,6 @@ void logFile(string strFile, string strLog)
     }
 
     datalink = pcap_datalink(pcapFile);
-
-    uint32_t ret2 = pcap_compile(pcapFile, &fp, str_filter.c_str(), 0, 0xffffffff); // create the filter
-    uint32_t ret3 = pcap_setfilter(pcapFile, &fp);                                  // attach the filter to the handle
 
     if (pcap_loop(pcapFile, -1, pcapHandler, NULL) < 0)
     {
