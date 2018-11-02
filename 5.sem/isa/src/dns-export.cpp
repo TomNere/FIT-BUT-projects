@@ -8,20 +8,16 @@
 #include <iterator>
 #include <sstream>
 
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/ip6.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-#include <arpa/inet.h>
-#include <netinet/if_ether.h> 
+
+
 #include <err.h>
 
 #ifdef __linux__            // for Linux
-#include <netinet/ether.h> 
+
 #include <time.h>
 #endif
 
+#include "DnsPacket.cpp"
 #include "parsers.cpp"
 
 using namespace std;
@@ -92,10 +88,10 @@ class DnsRecord
 
         DnsRecord(string d, uint32_t rt, string ra, uint32_t c)
         {
-            domain = d;
-            rrType = rt;
-            rrAnswer = ra;
-            count = c;
+            this->domain = d;
+            this->rrType = rt;
+            this->rrAnswer = ra;
+            this->count = c;
         }
 
         bool IsEqual(DnsRecord)
@@ -240,32 +236,11 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     uint32_t currentPos = 0;
     ipInfo ip;
 
-    uint8_t* packet = (uint8_t*) origPacket;    // Const is useless
-
-    struct pcap_pkthdr header;
-    header.ts = origHeader->ts;
-    header.caplen = origHeader->caplen;
-    header.len = origHeader->len;
     
-    int protType = getTransProt(&currentPos, packet);
-
-    switch (protType)
-    {
-        case UDP:
-            dnsInfo dns;
-            currentPos = dnsParse(currentPos, &header, packet, &dns, !FORCE);
-
-            if (currentPos != 0)
-            {
-                printSummary(&ip, &dns, &header);
-            }
-        case TCP:
-            // TODO
-            LOGGING("TCP not implemented yet");
-        default:
-            return;
-    }
     
+    DnsPacket packet(*origPacket, *origHeader);
+    packet.Parse();
+
     
     // else if (ethType == 0x86DD)
     // {
@@ -351,7 +326,8 @@ int main(int argc, char const *argv[])
 
 
 // Output the DNS data.
-void printSummary(ipInfo* ip, dnsInfo* dns, struct pcap_pkthdr * header) {
+void printSummary(ipInfo* ip, DnsData* dns, struct pcap_pkthdr* header)
+{
     LOGGING("Printing summary");
     char proto;
 
@@ -362,7 +338,6 @@ void printSummary(ipInfo* ip, dnsInfo* dns, struct pcap_pkthdr * header) {
     // Print it resource record type in turn (for those enabled).
     printRRSection(dns->answers, "!");
     
-    dnsRR_free(dns->answers);
     fflush(stdout); 
     fflush(stderr);
 }

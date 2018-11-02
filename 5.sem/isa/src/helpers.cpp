@@ -194,45 +194,45 @@ char* readRRName(const uint8_t* packet, uint32_t* packetPos, uint32_t idPos, uin
 }
 
 // Print all resource records in the given section.
-void printRRSection(dnsRR * next, char * name) {
-    int skip;
-    int i;
-    while (next != NULL) {
+void printRRSection(list<dnsRR> rrs, string name) {
+    list <dnsRR> :: iterator it; 
+        
+    for(it = rrs.begin(); it != rrs.end(); it++) 
+    {
         // Print the rr seperator and rr section name.
         cout << '\t' << name;
-        skip = 0;
         // Search the excludes list to see if we should not print this
         // rtype.
         
-            string name, data;
-            name = (next->name == NULL) ? "*empty*" : next->name;
-            data = (next->data == NULL) ? "*empty*" : next->data;
-            cout << "RECORD 1. output\n";
+        string name, data;
+        name = (it->name.empty()) ? "*empty*" : it->name;
+        data = (it->data.empty()) ? "*empty*" : it->data;
+        cout << "RECORD 1. output\n";
             
-                if (next->rrName == NULL) 
-                    // Handle bad records.
-                    cout <<  name <<" UNKNOWN(" << next->type << next->cls << data;
-                else
-                    // Print the string rtype name with the rest of the record.
-                    cout << name << " " << next->rrName << " " << data;
+        if (it->rrName.empty())
+        {
+            // Handle bad records.
+            cout <<  name <<" UNKNOWN(" << it->type << it->cls << data;
+        }
+        else
+            // Print the string rtype name with the rest of the record.
+            cout << name << " " << it->rrName << " " << data;
 
                 cout << "RECORD 2. output";
                 // The -r option case. 
                 // Print the rtype and class number with the record.
-                cout << name << " " << " " << next->type << " " << next->cls << " " << data;
-        
-        next = next->next; 
+                cout << name << " " << " " << it->type << " " << it->cls << " " << data;
     }
 }
 
-// Free a dnsRR struct.
-void dnsRR_free(dnsRR * rr) {
-    if (rr == NULL) return;
-    if (rr->name != NULL) free(rr->name);
-    if (rr->data != NULL) free(rr->data);
-    dnsRR_free(rr->next);
-    free(rr);
-}
+// // Free a dnsRR struct.
+// void dnsRR_free(dnsRR * rr) {
+//     if (rr == NULL) return;
+//     if (rr->name.empty()) free(rr->name);
+//     if (rr->data != NULL) free(rr->data);
+//     dnsRR_free(rr->next);
+//     free(rr);
+// }
 
 
 
