@@ -85,28 +85,57 @@ class DnsPacket
             return;
         }
 
-        dns.id = (packet[this->position] << 8) + packet[this->position+1];
-        dns.qr = packet[this->position+2] >> 7;
-        dns.AA = (packet[this->position+2] & 0x04) >> 2;
-        dns.TC = (packet[this->position+2] & 0x02) >> 1;
-        dns.rcode = packet[pos + 3] & 0x0f;
+        //uint8_t* new_packet = &(this->packet);
+
+        dns.id = ((&packet)[this->position] << 8) + (&packet)[this->position + 1];
+        dns.qr = (&packet)[this->position + 2] >> 7;
+        dns.AA = ((&packet)[this->position + 2] & 0x04) >> 2;
+        dns.TC = ((&packet)[this->position + 2] & 0x02) >> 1;
+        dns.rcode = (&packet)[this->position + 3] & 0x0f;
 
         // rcodes > 5 indicate various protocol errors and redefine most of the 
         // remaining fields. Parsing this would hurt more than help. 
-        if (dns->rcode > 5) {
+        if (dns.rcode > 5) {
             LOGGING("Rcode > 5. Skipping");
-            return 0;
+            return;
         }
 
         // Counts for each of the record types.
-        int qdCount = (packet[this->position+4] << 8) + packet[this->position+5];
-        dns->ancount = (packet[this->position+6] << 8) + packet[this->position+7];
+        int qdCount = ((&packet)[this->position + 4] << 8) + (&packet)[this->position + 5];
+        dns.ancount = ((&packet)[this->position + 6] << 8) + (&packet)[this->position + 7];
 
         // Skip questions
-        pos = pos + 12 + (qdCount * 4);
+        this->position = this->position + 12 + (qdCount * 4);
 
         // Parse answer records
-        pos = parseRRSet(pos, idPos, header, packet, dns->ancount, dns->answers);
+        this->parseRRSet(idPos);
+    }
+
+    // Parse a set of resource records in the dns protocol in 'packet', starting
+    // at 'pos'. The 'idPos' offset is necessary for putting together 
+    // compressed names. 'count' is the expected number of records of this type.
+    // 'root' is where to assign the parsed list of objects.
+    // Return 0 on error, the new 'pos' in the packet otherwise.
+    void parseRRSet(uint32_t idPos)
+    {
+        for (int i = 0; i < this->dns.ancount; i++)
+        {
+            // Create and clear the data in a new dnsRR object.
+            DnsRR current;
+            current.name = ""; 
+            current.data = "";
+
+            this->position = current.ParseRR(this->position, idPos, &(this->header), &(this->packet));
+
+            // If a non-recoverable error occurs when parsing an rr, 
+            // we can only return what we've got and give up.
+            if (this->position == 0)
+            {
+                LOGGING("Error occured when RR parsing")
+                return;
+            }
+            this->dns.answers.push_front(current);
+        }
     }
 
     public:

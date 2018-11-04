@@ -3,8 +3,5 @@
 
 #include "structures.h"
 
-#define PARSERS_COUNT 11
-
-rrParserContainer* findParser(uint16_t, uint16_t);
 
 #endif
