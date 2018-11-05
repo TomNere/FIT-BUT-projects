@@ -8,8 +8,6 @@
 #include <iterator>
 #include <sstream>
 
-
-
 #include <err.h>
 
 #ifdef __linux__            // for Linux
@@ -17,13 +15,12 @@
 #include <time.h>
 #endif
 
+#include "structures.h"
 #include "DnsPacket.cpp"
-#include "parsers.cpp"
 
 using namespace std;
 uint32_t packetCount = 0;
 uint32_t datalink;
-
 
 
 /******************************************************** CLASSES ************************************************************/
@@ -32,27 +29,28 @@ class DnsRecord
 {
 	string domain;
 	uint32_t rrType;
+    string rrName;
 	string rrAnswer;
 	uint count;
 
-    string getRRType()
-    {
-        
-    }
-        
-
     public:
 
-        DnsRecord(string d, uint32_t rt, string ra, uint32_t c)
+        DnsRecord(string d, uint32_t rrt, string rrn, string rra)
         {
             this->domain = d;
-            this->rrType = rt;
-            this->rrAnswer = ra;
-            this->count = c;
+            this->rrType = rrt;
+            this->rrName = rrn;
+            this->rrAnswer = rra;
+            this->count = 1;
         }
 
-        bool IsEqual(DnsRecord)
+        bool IsEqual(string d, uint32_t rrt, string rra)
         {
+            if (d.compare(this->domain) || rrt != this->rrType || rra.compare(this->rrAnswer))
+            {
+                return false;
+            }
+            
             return true;
         }
 
@@ -65,7 +63,7 @@ class DnsRecord
         {
             string str;
             stringstream ss;
-            ss << "rrtype: " << getRRType() << " , count: " << count;
+            ss << this->domain << " " << this->rrName << " " << this->rrAnswer << " " << count << endl;
             return ss.str();
         }
 };
@@ -74,23 +72,26 @@ class RecordCollection
 {
     list<DnsRecord> innerList;
 
-    void AddRecord(DnsRecord record)
-    {
-        list <DnsRecord> :: iterator it; 
-        
-        for(it = innerList.begin(); it != innerList.end(); it++) 
+    public:
+        void AddRecord(string d, uint32_t rrt, string rrn, string rra)
         {
-            if ((*it).IsEqual(record))
+            list <DnsRecord> :: iterator it; 
+        
+            for(it = innerList.begin(); it != innerList.end(); it++) 
             {
-                (*it).AddRecord();
-                return;
-            }
-            innerList.push_front(record);
-        }
-    }
+                if ((*it).IsEqual(d, rrt, rra))
+                {
+                    (*it).AddRecord();
+                    return;
+                }
 
+                DnsRecord dnsR(d, rrt, rrn, rra);
+                this->innerList.push_front(dnsR);
+            }
+        }
 };
 
+RecordCollection allRecords;
 
 /********************************************************** METHODS **********************************************************/
 
@@ -194,9 +195,16 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     ipInfo ip;
     
     
-    DnsPacket packet(*origPacket, *origHeader);
+    DnsPacket packet(origPacket, *origHeader);
     packet.Parse();
 
+    list <DnsRR> :: iterator it; 
+        
+    for(it = packet.dns.answers.begin(); it != packet.dns.answers.end(); it++) 
+    {
+        allRecords.AddRecord(it->name, it->type, it->rrName, it->data);
+    }
+    
     
     // else if (ethType == 0x86DD)
     // {
@@ -226,9 +234,9 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     // }
 
     // Expire tcp sessions, and output them if possible.
-    fprintf(stderr, "Expiring TCP.\n");
+    //fprintf(stderr, "Expiring TCP.\n");
     //tcp_expire(conf, &header.ts);
-    cout << "//////////////////////////////////////////////\n\n";
+    //cout << "//////////////////////////////////////////////\n\n";
 }
 
 void logFile(string strFile, string strLog)
@@ -277,19 +285,19 @@ int main(int argc, char const *argv[])
 
 
 // Output the DNS data.
-void printSummary(ipInfo* ip, DnsData* dns, struct pcap_pkthdr* header)
-{
-    LOGGING("Printing summary");
-    char proto;
+// void printSummary(ipInfo* ip, DnsData* dns, struct pcap_pkthdr* header)
+// {
+//     LOGGING("Printing summary");
+//     char proto;
 
-    uint32_t dnslength;
+//     uint32_t dnslength;
 
-    print_ts(&(header->ts));
+//     print_ts(&(header->ts));
 
-    // Print it resource record type in turn (for those enabled).
-    printRRSection(dns->answers, "!");
+//     // Print it resource record type in turn (for those enabled).
+//     printRRSection(dns->answers, "!");
     
-    fflush(stdout); 
-    fflush(stderr);
-}
+//     fflush(stdout); 
+//     fflush(stderr);
+// }
 

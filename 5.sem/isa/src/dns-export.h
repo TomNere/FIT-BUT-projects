@@ -11,6 +11,7 @@
 #include <iterator>
 #include <stdio.h>
 #include "structures.h"
+#include "DnsData.cpp"
 
 using namespace std;
 

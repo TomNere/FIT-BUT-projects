@@ -1,4 +1,4 @@
-#include "dns-export.h"
+#include <string>
 #include "helpers.h"
 #include "structures.h"
 
@@ -99,36 +99,37 @@ char * iptostr(ipAddr * ip) {
 
 
 // Print all resource records in the given section.
-void printRRSection(list<dnsRR> rrs, string name) {
-    list <dnsRR> :: iterator it; 
+// void printRRSection(list<DnsRR> rrs, string name)
+// {
+//     list <DnsRR> :: iterator it; 
         
-    for(it = rrs.begin(); it != rrs.end(); it++) 
-    {
-        // Print the rr seperator and rr section name.
-        cout << '\t' << name;
-        // Search the excludes list to see if we should not print this
-        // rtype.
+//     for(it = rrs.begin(); it != rrs.end(); it++) 
+//     {
+//         // Print the rr seperator and rr section name.
+//         cout << '\t' << name;
+//         // Search the excludes list to see if we should not print this
+//         // rtype.
         
-        string name, data;
-        name = (it->name.empty()) ? "*empty*" : it->name;
-        data = (it->data.empty()) ? "*empty*" : it->data;
-        cout << "RECORD 1. output\n";
+//         string name, data;
+//         name = (it->name.empty()) ? "*empty*" : it->name;
+//         data = (it->data.empty()) ? "*empty*" : it->data;
+//         cout << "RECORD 1. output\n";
             
-        if (it->rrName.empty())
-        {
-            // Handle bad records.
-            cout <<  name <<" UNKNOWN(" << it->type << it->cls << data;
-        }
-        else
-            // Print the string rtype name with the rest of the record.
-            cout << name << " " << it->rrName << " " << data;
+//         if (it->rrName.empty())
+//         {
+//             // Handle bad records.
+//             cout <<  name <<" UNKNOWN(" << it->type << it->cls << data;
+//         }
+//         else
+//             // Print the string rtype name with the rest of the record.
+//             cout << name << " " << it->rrName << " " << data;
 
-                cout << "RECORD 2. output";
-                // The -r option case. 
-                // Print the rtype and class number with the record.
-                cout << name << " " << " " << it->type << " " << it->cls << " " << data;
-    }
-}
+//                 cout << "RECORD 2. output";
+//                 // The -r option case. 
+//                 // Print the rtype and class number with the record.
+//                 cout << name << " " << " " << it->type << " " << it->cls << " " << data;
+//     }
+// }
 
 // // Free a dnsRR struct.
 // void dnsRR_free(dnsRR * rr) {

@@ -16,23 +16,21 @@ using namespace std;
 
 class DnsPacket
 {
-    uint8_t packet;
+    uint8_t* packet;
     struct pcap_pkthdr header;
     uint32_t position;
     int protType;
     uint32_t transProt;
-    DnsData dns;
 
     uint32_t getTransProt()
     {
-        struct ether_header *eptr;
+        struct ether_header* eptr;
         struct ip* myIp;
         struct ip6_hdr* myIpv6;
 
         // read the Ethernet header
         eptr = (struct ether_header*) packet;
         this->position += sizeof(struct ether_header);
-
 
         // parse ethernet type 
         switch (ntohs(eptr->ether_type))
@@ -52,7 +50,7 @@ class DnsPacket
                 this->protType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
                 break;
             default:
-                LOGGING("Invalid ethernet type for DNS");
+                LOGGING("Invalid ethernet type for DNS: " << ntohs(eptr->ether_type));
                 return 0;
         }
 
@@ -87,11 +85,11 @@ class DnsPacket
 
         //uint8_t* new_packet = &(this->packet);
 
-        dns.id = ((&packet)[this->position] << 8) + (&packet)[this->position + 1];
-        dns.qr = (&packet)[this->position + 2] >> 7;
-        dns.AA = ((&packet)[this->position + 2] & 0x04) >> 2;
-        dns.TC = ((&packet)[this->position + 2] & 0x02) >> 1;
-        dns.rcode = (&packet)[this->position + 3] & 0x0f;
+        dns.id = (packet[this->position] << 8) + packet[this->position + 1];
+        dns.qr = packet[this->position + 2] >> 7;
+        dns.AA = (packet[this->position + 2] & 0x04) >> 2;
+        dns.TC = (packet[this->position + 2] & 0x02) >> 1;
+        dns.rcode = packet[this->position + 3] & 0x0f;
 
         // rcodes > 5 indicate various protocol errors and redefine most of the 
         // remaining fields. Parsing this would hurt more than help. 
@@ -101,8 +99,8 @@ class DnsPacket
         }
 
         // Counts for each of the record types.
-        int qdCount = ((&packet)[this->position + 4] << 8) + (&packet)[this->position + 5];
-        dns.ancount = ((&packet)[this->position + 6] << 8) + (&packet)[this->position + 7];
+        int qdCount = (packet[this->position + 4] << 8) + packet[this->position + 5];
+        dns.ancount = (packet[this->position + 6] << 8) + packet[this->position + 7];
 
         // Skip questions
         this->position = this->position + 12 + (qdCount * 4);
@@ -121,11 +119,11 @@ class DnsPacket
         for (int i = 0; i < this->dns.ancount; i++)
         {
             // Create and clear the data in a new dnsRR object.
-            DnsRR current;
+            DnsRR current(this->position, idPos, &(this->header), this->packet);
             current.name = ""; 
             current.data = "";
 
-            this->position = current.ParseRR(this->position, idPos, &(this->header), &(this->packet));
+            this->position = current.ParseRR();
 
             // If a non-recoverable error occurs when parsing an rr, 
             // we can only return what we've got and give up.
@@ -139,9 +137,11 @@ class DnsPacket
     }
 
     public:
-        DnsPacket(uint8_t p, struct pcap_pkthdr h)
+        DnsData dns;
+
+        DnsPacket(const uint8_t* p, struct pcap_pkthdr h)
         {
-            this->packet = p;
+            this->packet = (uint8_t*) p;
             this->header.ts = h.ts;
             this->header.caplen = h.caplen;
             this->header.len = h.len;
@@ -150,7 +150,7 @@ class DnsPacket
 
         void Parse()
         {
-            this->getTransProt();
+            this->protType = this->getTransProt();
 
             switch (this->protType)
             {
@@ -159,7 +159,7 @@ class DnsPacket
 
                     if (this->position != 0)
                     {
-                        printSummary(&ip, &dns, &header);
+                        //printSummary(&ip, &dns, &header);
                     }
                     break;
                 case TCP:
@@ -170,4 +170,4 @@ class DnsPacket
                     return;
             }
         }
-}
+};

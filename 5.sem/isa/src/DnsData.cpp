@@ -7,7 +7,6 @@ using namespace std;
 class DnsData
 {
     // parsers
-    
 
     public:
         uint16_t id;
@@ -25,4 +24,3 @@ class DnsData
         }
 
 };
-
