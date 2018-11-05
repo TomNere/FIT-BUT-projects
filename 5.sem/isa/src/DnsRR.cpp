@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>      // std::stringstream
 #include "structures.h"
+#include "helpers.cpp"
 
 using namespace std;
 
@@ -176,6 +177,8 @@ class DnsRR
 
     /****************************************** RR parsers *****************************************************/
 
+    // A (IPv4 address) format
+    // A records are simply an IPv4 address, and are formatted as such
     void parserA()
     {
         if (rdlength != 4)
@@ -189,7 +192,8 @@ class DnsRR
         ss >> this->data;
     }
 
-
+    // domain name like format
+    // A DNS like name. This format is used for many record types
     void parserDOMAIN_NAME()
     {
         string name = this->readRRName();
@@ -200,6 +204,8 @@ class DnsRR
         this->data = name;
     }
 
+    // Start of Authority format
+    // Presented as a series of labeled SOA fields.
     void parserSOA()
     {
         string mname;
@@ -240,146 +246,145 @@ class DnsRR
         ss >> this->data; 
     }
 
-#define MX_DOC "Mail Exchange record format\n"\
-"A standard dns name preceded by a preference number."
-char * mx(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                uint16_t rdlength, uint32_t plen) {
+    // Mail Exchange record format
+    // A standard dns name preceded by a preference number.
+    void parserMX()
+    {
 
-    uint16_t pref = (packet[pos] << 8) + packet[pos+1];
-    char * name;
-    char * buffer;
-    uint32_t spos = pos;
+        uint16_t pref = (this->packet[this->position] << 8) + this->packet[this->position + 1];
+        string name;
+        string buffer;
+        uint32_t spos = this->position;
 
-    pos = pos + 2;
-    name = readRRName(packet, &pos, idPos, plen);
-    if (name == NULL) 
-        return mk_error("Bad MX: ", packet, spos, rdlength);
+        this->position = this->position + 2;
+        name = readRRName();
+        if (name.empty()) 
+            return;
 
-    buffer = (char*)  malloc(sizeof(char)*(5 + 1 + strlen(name) + 1));
-    sprintf(buffer, "%d,%s", pref, name);
-    free(name);
-    return buffer;
-}
-
-#define AAAA_DOC "IPv6 record format.  RFC 3596\n"\
-"A standard IPv6 address. No attempt is made to abbreviate the address."
-char * AAAA(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                  uint16_t rdlength, uint32_t plen) {
-    char *buffer;
-    uint16_t ipv6[8];
-    int i;
-
-    if (rdlength != 16) { 
-        return mk_error("Bad AAAA record", packet, pos, rdlength);
+        stringstream ss;
+        ss << pref << "," << name;
+        ss >> this->data; 
     }
 
-    for (i=0; i < 8; i++) 
-        ipv6[i] = (packet[pos+i*2] << 8) + packet[pos+i*2+1];
-    buffer = (char*)  malloc(sizeof(char) * (4*8 + 7 + 1));
-    sprintf(buffer, "%x:%x:%x:%x:%x:%x:%x:%x", ipv6[0], ipv6[1], ipv6[2],
-                                               ipv6[3], ipv6[4], ipv6[5],
-                                               ipv6[6], ipv6[7]); 
-    return buffer;
-}
+    // IPv6 record format.  RFC 3596
+    // A standard IPv6 address. No attempt is made to abbreviate the address.
+    void parserAAAA()
+    {
+        char *buffer;
+        uint16_t ipv6[8];
+        int i;
 
-#define KEY_DOC "dnssec Key format. RFC 4034\n"\
-"format: flags, proto, algorithm, key\n"\
-"All fields except the key are printed as decimal numbers.\n"\
-"The key is given in base64. "
-char * dnskey(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                    uint16_t rdlength, uint32_t plen) {
-    uint16_t flags = (packet[pos] << 8) + packet[pos+1];
-    uint8_t proto = packet[pos+2];
-    uint8_t algorithm = packet[pos+3];
-    char *buffer, *key;
+        if (this->rdlength != 16)
+        {
+            return;
+        }
 
-    key = b64encode(packet, pos+4, rdlength-4);
-    buffer = (char*) malloc(sizeof(char) * (1 + strlen(key) + 18));
-    sprintf(buffer, "%d,%d,%d,%s", flags, proto, algorithm, key);
-    free(key);
-    return buffer;
-}
+        for (i=0; i < 8; i++) 
+            ipv6[i] = (packet[this->position + i * 2] << 8) + packet[this->position + i * 2 + 1];
 
-#define RRSIG_DOC "DNS SEC Signature. RFC 4304\n"\
-"format: tc,alg,labels,ottl,expiration,inception,tag signer signature\n"\
-"All fields except the signer and signature are given as decimal numbers.\n"\
-"The signer is a standard DNS name.\n"\
-"The signature is base64 encoded."
-char * rrsig(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                   uint16_t rdlength, uint32_t plen) {
-    uint32_t o_pos = pos;
-    uint16_t tc = (packet[pos] << 8) + packet[pos+1];
-    uint8_t alg = packet[pos+2];
-    uint8_t labels = packet[pos+3];
-    u_int ottl, sig_exp, sig_inc;
-    uint16_t key_tag = (packet[pos+16] << 8) + packet[pos+17];
-    char *signer, *signature, *buffer;
-    pos = pos + 4;
-    ottl = (packet[pos] << 24) + (packet[pos+1] << 16) + 
-           (packet[pos+2] << 8) + packet[pos+3];
-    pos = pos + 4;
-    sig_exp = (packet[pos] << 24) + (packet[pos+1] << 16) + 
-              (packet[pos+2] << 8) + packet[pos+3];
-    pos = pos + 4; 
-    sig_inc = (packet[pos] << 24) + (packet[pos+1] << 16) + 
-              (packet[pos+2] << 8) + packet[pos+3];
-    pos = pos + 6;
-    signer = readRRName(packet, &pos, idPos, o_pos+rdlength);
-    if (signer == NULL) 
-        return mk_error("Bad Signer name", packet, pos, rdlength);
-        
-    signature = b64encode(packet, pos, o_pos+rdlength-pos);
-    buffer = (char*) malloc(sizeof(char) * (2*5 + // 2 16 bit ints
-                                    3*10 + // 3 32 bit ints
-                                    2*3 + // 2 8 bit ints
-                                    8 + // 8 separator chars
-                                    strlen(signer) +
-                                    strlen(signature) + 1));
-    sprintf(buffer, "%d,%d,%d,%d,%d,%d,%d,%s,%s", tc, alg, labels, ottl, 
-                    sig_exp, sig_inc, key_tag, signer, signature);
-    free(signer);
-    free(signature);
-    return buffer;
-}
-
-#define NSEC_DOC "NSEC format.  RFC 4034\n"\
-"Format: domain bitmap\n"\
-"domain is a DNS name, bitmap is hex escaped."
-char * nsec(const uint8_t * packet, uint32_t pos, uint32_t idPos,
-                  uint16_t rdlength, uint32_t plen) {
-
-    char *buffer, *domain, *bitmap;
-
-    domain = readRRName(packet, &pos, idPos, pos+rdlength);
-    if (domain == NULL) 
-        return mk_error("Bad NSEC domain", packet, pos, rdlength);
+        stringstream ss;
+        ss << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" <<
+            ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
     
-    // bitmap = escape_data(packet, pos, pos+rdlength);
-    // buffer = (char*) malloc(sizeof(char) * (strlen(domain)+strlen(bitmap)+2));
-    // sprintf(buffer, "%s,%s", domain, bitmap);
-    // free(domain);
-    // free(bitmap);
-    return buffer;
+        ss >> this->data;
+    }
 
-}
+    // dnssec Key format. RFC 4034
+    // format: flags, proto, algorithm, key
+    // All fields except the key are printed as decimal numbers.
+    // The key is given in base64.
+    void dnskey()
+    {
+        uint16_t flags = (packet[this->position] << 8) + packet[this->position + 1];
+        uint8_t proto = packet[this->position + 2];
+        uint8_t algorithm = packet[this->position + 3];
+        char* key;
 
-#define DS_DOC "DS DNS SEC record.  RFC 4034\n"\
-"format: key_tag,algorithm,digest_type,digest\n"\
-"The keytag, algorithm, and digest type are given as base 10.\n"\
-"The digest is base64 encoded."
-char * ds(const uint8_t * packet, uint32_t pos, uint32_t idPos, uint16_t rdlength, uint32_t plen) {
-    uint16_t key_tag = (packet[pos] << 8) + packet[pos+1];
-    uint8_t alg = packet[pos+2];
-    uint8_t dig_type = packet[pos+3];
-    char * digest = b64encode(packet,pos+4,rdlength-4);
-    char * buffer;
+        key = b64encode(packet, this->position + 4, this->rdlength - 4);
 
-    buffer = (char*) malloc(sizeof(char) * (strlen(digest) + 15));
-    sprintf(buffer,"%d,%d,%d,%s", key_tag, alg, dig_type, digest);
-    free(digest);
-    return buffer;
-}
+        stringstream ss;
+        ss << flags << "," << proto << "," << algorithm << "," << key;
+        ss >> this->data;
+    }
 
+    // DNS SEC Signature. RFC 4304
+    // format: tc,alg,labels,ottl,expiration,inception,tag signer signature
+    // All fields except the signer and signature are given as decimal numbers
+    // The signer is a standard DNS name
+    // The signature is base64 encoded
+    void rrsig()
+    {
+        uint32_t o_pos = this->position;
+        uint16_t tc = (packet[this->position] << 8) + packet[this->position + 1];
+        uint8_t alg = packet[this->position + 2];
+        uint8_t labels = packet[this->position + 3];
+        u_int ottl, sig_exp, sig_inc;
+        uint16_t key_tag = (packet[this->position + 16] << 8) + packet[this->position + 17];
+        string signer;
+        char* signature;
+
+        this->position += 4;
+        ottl = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
+        this->position += 4;
+        sig_exp = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
+        this->position += 4; 
+        sig_inc = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
+        this->position += 6;
+
+        uint16_t o_rdlength = this->rdlength;
+        this->rdlength += o_pos;
+        signer = readRRName();
+        this->rdlength = o_rdlength;
+
+        if (signer.empty())
+        {
+            return;
+        }
+        
+        signature = b64encode(packet, this->position, o_pos + rdlength - this->position);
+    
+        stringstream ss;
+        ss << tc << "," << alg << "," << labels << "," << ottl << "," << sig_exp << "," << sig_inc << "," << key_tag << "," << signer << "," << signature;
+        ss >> this->data;
+    }
+
+    // NSEC format.  RFC 4034
+    // Format: domain bitmap
+    // domain is a DNS name, bitmap is hex escaped
+    void nsec()
+    {
+        string buffer, domain, bitmap;
+
+        uint16_t oldRdlength = this->rdlength;
+        this->rdlength += this->position;
+        domain = readRRName();
+
+        if (domain.empty())
+        {
+            return;
+        } 
+    
+        bitmap = escape_data(packet, this->position, this->position + oldRdlength);
+        stringstream ss;
+        ss << domain << "," << bitmap;
+        ss >> this->data;
+    }
+
+    //DS DNS SEC record.  RFC 4034
+    //format: key_tag,algorithm,digest_type,digest
+    //The keytag, algorithm, and digest type are given as base 10
+    //The digest is base64 encoded
+    void ds()
+    {
+        uint16_t key_tag = (packet[this->position] << 8) + packet[this->position + 1];
+        uint8_t alg = packet[this->position + 2];
+        uint8_t dig_type = packet[this->position + 3];
+        char* digest = b64encode(packet ,this->position + 4, this->rdlength - 4);
+
+        stringstream ss;
+        ss << key_tag << "," << alg<< "," << dig_type<< "," << digest;
+        ss >> this->data;
+    }
 
 
     public:

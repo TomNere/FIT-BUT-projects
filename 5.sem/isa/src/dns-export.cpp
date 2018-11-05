@@ -37,50 +37,7 @@ class DnsRecord
 
     string getRRType()
     {
-        switch (rrType)
-        {
-            case 1:
-                return "A";
-            case 28:
-                return "AAAA";
-            case 5:
-                return "CNAME";
-            case 15:
-                return "MX";
-            case 2:
-                return "NS";
-            case 6:
-                return "SOA";
-            case 16:
-                return "TXT";
-            case 99:
-                return "SPF";
-            // DNSSEC
-            case 32769:
-                return "DLV";
-            case 48:
-                return "DNSKEY";
-            case 43:
-                return "DS";
-            case 25:
-                return "KEY";
-            case 47:
-                return "NSEC";
-            case 50:
-                return "NSEC3";
-            case 46:
-                return "RRSIG";
-            case 24:
-                return "SIG";
-            case 32768:
-                return "TA";
-            case 250:
-                return "TSIG";
-            case 30:
-                return "NXT";
-            default:
-                return "Unknown";
-        }
+        
     }
         
 
@@ -235,7 +192,6 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
 
     uint32_t currentPos = 0;
     ipInfo ip;
-
     
     
     DnsPacket packet(*origPacket, *origHeader);
@@ -268,11 +224,6 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     //     fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
     //     return;
     // }
-   
-    if (packet != origPacket) {
-        // Free data from artificially constructed packets.
-        free(packet);
-    }
 
     // Expire tcp sessions, and output them if possible.
     fprintf(stderr, "Expiring TCP.\n");
