@@ -219,15 +219,18 @@ class DnsRR
 
         stringstream ss;
 
-        ss << packet[this->position] << " " << packet[this->position + 1] << " " << packet[this->position + 2] << " " << packet[this->position + 3];
+        ss << (int)packet[this->position] << "." << (int)packet[this->position + 1] << "." << (int)packet[this->position + 2] << "." << (int)packet[this->position + 3];
         ss >> this->data;
+        cout << "parserA data: " << this->data << endl;
     }
 
     // domain name like format
     // A DNS like name. This format is used for many record types
     void parserDOMAIN_NAME()
     {
+        uint32_t pos = this->position;
         string name = this->readRRName();
+        this->position = pos;
         if (name.empty())
         {
             LOGGING("Invalid domain name.")
@@ -487,6 +490,7 @@ class DnsRR
 
             if ((header->len - this->position) < 10)
             {
+                ERR_RET("HERE");
                 return 0;
             }
 
@@ -520,6 +524,7 @@ class DnsRR
             //        rr->rdlength);
             // fprintf(stderr, "rr->data %s\n", rr->data);
 
+            cout << "returning pos: " << this->position << " rdlength: " << this->rdlength << endl;
             return this->position + this->rdlength;
         }
 };
