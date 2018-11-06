@@ -10,11 +10,10 @@
 #include <list>
 #include <iterator>
 #include <stdio.h>
-#include "structures.h"
-#include "DnsData.cpp"
 
 using namespace std;
 
+void pcapHandler(unsigned char*, const struct pcap_pkthdr*, const uint8_t*);
+
 /******************************************************** CONST & MACROS *******************************************************/
-void printSummary(ipInfo*, DnsData*, struct pcap_pkthdr*);
 #endif

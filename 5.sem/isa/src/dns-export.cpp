@@ -6,108 +6,30 @@
 #include <string.h>
 #include <list>
 #include <iterator>
-#include <sstream>
 
 #include <err.h>
 
-#ifdef __linux__            // for Linux
-
-#include <time.h>
-#endif
-
+#include "dns-export.h"
 #include "structures.h"
 #include "DnsPacket.cpp"
+#include "DnsRecord.cpp"
 
 using namespace std;
 uint32_t packetCount = 0;
-uint32_t datalink;
+list<DnsRecord> recordList;
 
-
-/******************************************************** CLASSES ************************************************************/
-
-class DnsRecord
-{
-	string domain;
-	uint32_t rrType;
-    string rrName;
-	string rrAnswer;
-	uint count;
-
-    public:
-
-        DnsRecord(string d, uint32_t rrt, string rrn, string rra)
-        {
-            this->domain = d;
-            this->rrType = rrt;
-            this->rrName = rrn;
-            this->rrAnswer = rra;
-            this->count = 1;
-        }
-
-        bool IsEqual(string d, uint32_t rrt, string rra)
-        {
-            if (d.compare(this->domain) || rrt != this->rrType || rra.compare(this->rrAnswer))
-            {
-                return false;
-            }
-            
-            return true;
-        }
-
-        void AddRecord()
-        {
-            count++;
-        }
-
-        string GetString()
-        {
-            string str;
-            stringstream ss;
-            ss << this->domain << " " << this->rrName << " " << this->rrAnswer << " " << count << endl;
-            return ss.str();
-        }
-};
-
-class RecordCollection
-{
-    list<DnsRecord> innerList;
-
-    public:
-        void AddRecord(string d, uint32_t rrt, string rrn, string rra)
-        {
-            list <DnsRecord> :: iterator it; 
-        
-            for(it = innerList.begin(); it != innerList.end(); it++) 
-            {
-                if ((*it).IsEqual(d, rrt, rra))
-                {
-                    (*it).AddRecord();
-                    return;
-                }
-            }
-
-            DnsRecord dnsR(d, rrt, rrn, rra);
-            this->innerList.push_front(dnsR);
-        }
-
-        void PrintRecords()
-        {
-            list <DnsRecord> :: iterator it; 
-        
-            for(it = innerList.begin(); it != innerList.end(); it++) 
-            {
-                cout << it->GetString();
-            }
-        }
-};
-
-RecordCollection allRecords;
 
 /********************************************************** METHODS **********************************************************/
 
 // Write stats to stdout
 void writeStats()
 {
+    list <DnsRecord> :: iterator it; 
+        
+    for(it = recordList.begin(); it != recordList.end(); it++) 
+    {
+        cout << it->GetString();
+    }
 }
 
 // Signal handler
@@ -173,7 +95,7 @@ rawParameters parseArg(int argc, char const *argv[])
 void logInterface(string strInterface, string strLog, string strTime)
 {
     int time;
-    if (strTime.compare(""))
+    if (!strTime.compare(""))
     {
         time = 60; // Default value
     }
@@ -190,8 +112,51 @@ void logInterface(string strInterface, string strLog, string strTime)
         }
     }
 
-    pcap_t *pcapInterface;
+    char errBuf[PCAP_ERRBUF_SIZE];
+    pcap_t* pcapInterface;
+
+    /* Define the device */
+		char* dev = pcap_lookupdev(errBuf);
+		if (dev == NULL) {
+			fprintf(stderr, "Couldn't find default device: %s\n", errBuf);
+			return;
+		}
+
     //if ((pcapInterface = pcap_open_live(strInterface.c_str(), 1, 1000, 1000))
+    if ((pcapInterface = pcap_open_live(dev, BUFSIZ, true, time * 100, errBuf)) == NULL)
+    {
+        ERR_RET("Unable to open interface for listening. Error: " << errBuf);
+    }
+
+    if (pcap_loop(pcapInterface, -1, pcapHandler, NULL) < 0)
+    {
+        pcap_close(pcapInterface);
+        ERR_RET("Error occured when listening on interface.");
+    }
+
+    pcap_close(pcapInterface);
+}
+
+void logFile(string strFile, string strLog)
+{
+    LOGGING("Logging from file");
+
+    char errBuf[PCAP_ERRBUF_SIZE];
+    pcap_t* pcapFile;
+
+    if ((pcapFile = pcap_open_offline(strFile.c_str(), errBuf)) == NULL)
+    {
+        ERR_RET("Unable to open pcap file. Error:" << errBuf);
+    }
+
+
+    if (pcap_loop(pcapFile, -1, pcapHandler, NULL) < 0)
+    {
+        pcap_close(pcapFile);
+        ERR_RET("Error occured when reading pcap file.");
+    }
+
+    pcap_close(pcapFile);
 }
 
 /*********************************************************** PCAP FILE ***************************************************************/
@@ -206,7 +171,6 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     // }
 
     uint32_t currentPos = 0;
-    ipInfo ip;
     
     
     DnsPacket packet(origPacket, *origHeader);
@@ -214,65 +178,30 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
 
     list <DnsRR> :: iterator it; 
     
-    for(it = packet.dns.answers.begin(); it != packet.dns.answers.end(); it++) 
+    for (it = packet.dns.answers.begin(); it != packet.dns.answers.end(); it++) 
     {
-        cout << "Adding answer with data: " << it->data << endl;
-        allRecords.AddRecord(it->name, it->type, it->rrName, it->data);
-    }
-    
-    
-    // else if (ethType == 0x86DD)
-    // {
-    //     currentPos = ipv6Parse(currentPos, &header, packet, &ip);
-    // }
-    // else
-    // {
-    //     LOGGING("Unsupported EtherType: " << ethType);
-    //     return;
-    // }
+        list <DnsRecord> :: iterator it2; 
+        
+        bool added = false;
+        for (it2 = recordList.begin(); it2 != recordList.end(); it2++) 
+        {
+            if (it2->IsEqual(it->name, it->type, it->data))
+            {
+                it2->AddRecord();
+                added = true;
+                break;
+            }
+        }
 
-    // // Fragmented or truncated packet
-    // if (currentPos == 0)
-    // {
-    //     return;
-    // }
-
-    // else if (ip.proto == TCP)
-    // {
-    //     // Hand the tcp packet over for later reconstruction.
-    //     // tcp_parse(currentPos, &header, packet, &ip, conf); 
-    // }
-    // else
-    // {
-    //     fprintf(stderr, "Unsupported Transport Protocol(%d)\n", ip.proto);
-    //     return;
-    // }
-
-    // Expire tcp sessions, and output them if possible.
-    //fprintf(stderr, "Expiring TCP.\n");
-    //tcp_expire(conf, &header.ts);
-    //cout << "//////////////////////////////////////////////\n\n";
-}
-
-void logFile(string strFile, string strLog)
-{
-    LOGGING("Logging from file");
-
-    char errBuf[PCAP_ERRBUF_SIZE];
-    pcap_t *pcapFile;
-
-    if ((pcapFile = pcap_open_offline(strFile.c_str(), errBuf)) == NULL)
-    {
-        ERR_RET("Unable to open pcap file.");
-    }
-
-    datalink = pcap_datalink(pcapFile);
-
-    if (pcap_loop(pcapFile, -1, pcapHandler, NULL) < 0)
-    {
-        ERR_RET("Error occured when reading pcap file.");
+        if (!added)
+        {
+            DnsRecord dnsR(it->name, it->type, it->rrName, it->data);
+            recordList.push_front(dnsR);
+        }
     }
 }
+
+
 
 /*********************************************************** MAIN ***************************************************************/
 
@@ -295,25 +224,6 @@ int main(int argc, char const *argv[])
         logFile(params.file, params.syslogServer);
     }
 
-    allRecords.PrintRecords();
+    writeStats();
     return 0;
 }
-
-
-// Output the DNS data.
-// void printSummary(ipInfo* ip, DnsData* dns, struct pcap_pkthdr* header)
-// {
-//     LOGGING("Printing summary");
-//     char proto;
-
-//     uint32_t dnslength;
-
-//     print_ts(&(header->ts));
-
-//     // Print it resource record type in turn (for those enabled).
-//     printRRSection(dns->answers, "!");
-    
-//     fflush(stdout); 
-//     fflush(stderr);
-// }
-

@@ -18,7 +18,7 @@ class DnsRR
         uint32_t endPos = 0;
         uint32_t nameLen = 0;
         uint32_t steps = 0;
-        string name;
+        string name = "";
         cout << this->position << " "<< this->header->len << " " << this->idPos << endl;
 
         // Scan through the name, one character at a time. We need to look at 
@@ -64,7 +64,7 @@ class DnsRR
             {
                 if (c >= '!' && c <= 'z' && c != '\\')
                 {
-                    nameLen ++;
+                    nameLen++;
                 }
                 else nameLen += 4;
                 pos++;
@@ -85,8 +85,8 @@ class DnsRR
         }
 
         nameLen++;
-
-        for (int i = 0; i <= nameLen; i++)
+        cout << "nameLen" << nameLen << endl;
+        for (int i = 0; i < nameLen; i++)
         {
             name += '\0';
         }
@@ -145,7 +145,12 @@ class DnsRR
         name[i] = 0;
 
         this->position = endPos + 1;
+
+        int index = name.find_first_of('\0');
+        name.resize(index);
+
         LOGGING("Returning RR name: " << name);
+        name.shrink_to_fit();
         return name;
     }
 
@@ -317,8 +322,7 @@ class DnsRR
             ipv6[i] = (packet[this->position + i * 2] << 8) + packet[this->position + i * 2 + 1];
 
         stringstream ss;
-        ss << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" <<
-            ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
+        ss << hex << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" << ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
     
         ss >> this->data;
     }

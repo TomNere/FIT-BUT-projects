@@ -51,31 +51,6 @@ const string reset("\033[0m");
     cerr << yellow << "LOG: " <<   \
     message << reset << endl;
 
-// Move IPv4 addr at pointer P into ip object D, and set it's type.
-#define IPv4_MOVE(D, P) D.addr.v4.s_addr = *(in_addr_t*)(P); \
-                        D.vers = IPv4;
-// Move IPv6 addr at pointer P into ip object D, and set it's type.
-#define IPv6_MOVE(D, P) memcpy(D.addr.v6.s6_addr, P, 16); D.vers = IPv6;
-
-// Compare two IP addresses.
-#define IP_CMP(ipA, ipB) ((ipA.vers == ipB.vers) &&\
-                          (ipA.vers == IPv4 ? \
-                            ipA.addr.v4.s_addr == ipB.addr.v4.s_addr : \
-                ((ipA.addr.v6.s6_addr32[0] == ipB.addr.v6.s6_addr32[0]) && \
-                 (ipA.addr.v6.s6_addr32[1] == ipB.addr.v6.s6_addr32[1]) && \
-                 (ipA.addr.v6.s6_addr32[2] == ipB.addr.v6.s6_addr32[2]) && \
-                 (ipA.addr.v6.s6_addr32[3] == ipB.addr.v6.s6_addr32[3])) \
-                 ))
-
-// Get the value of the BITth bit from byte offset O bytes from base B.
-#define GET_BIT(B,O,BIT) (uint8_t)(((*(B+O)) & (1 << (BIT))) >> BIT )
-// Get a two byte little endian u_int at base B and offset O.
-#define LE_U_SHORT(B,O) (uint16_t)((B[O]<<8)+B[O+1])
-// Get a four byte little endian u_int at base B and offset O.
-#define LE_U_INT(B,O) (uint32_t)((B[O]<<24)+(B[O+1]<<16)+(B[O+2]<<8)+B[O+3])
-// Get the DNS tcp length prepended field.
-#define TCP_DNS_LEN(P,O) ((P[O]<<8) + P[O+1])
-
 // Structure representing parameters of running program in raw string format
 typedef struct
 {
@@ -97,16 +72,6 @@ typedef struct ipAddr {
         struct in6_addr v6;
     } addr;
 } ipAddr;
-
-// Basic network layer information.
-typedef struct {
-    ipAddr src;
-    ipAddr dst;
-    uint32_t length;
-    uint8_t proto;
-} ipInfo;
-
-
 
 // TCP header information. Also contains pointers used to connect to this
 // to other TCP streams, and to connect this packet to other packets in
@@ -135,25 +100,5 @@ typedef struct tcpInfo {
     struct tcpInfo * nextPkt;
     struct tcpInfo * prevPkt;
 } tcpInfo;
-
-typedef char * rrDataParser(const uint8_t*, uint32_t, uint32_t, uint16_t, uint32_t);
-
-typedef struct {
-    uint16_t cls;
-    uint16_t rtype;
-    rrDataParser * parser;
-    const char * name;
-    const char * doc;
-    unsigned long long count;
-} rrParserContainer;
-
-// Transport information.
-typedef struct {
-    uint16_t srcport;
-    uint16_t dstport;
-    // Length of the payload.
-    uint16_t length;
-    uint8_t transport; 
-} transportInfo;
 
 #endif
