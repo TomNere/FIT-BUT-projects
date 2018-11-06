@@ -21,6 +21,7 @@ class DnsPacket
     uint32_t position;
     int protType;
     uint32_t transProt;
+    int qdCount;
 
     uint32_t getTransProt()
     {
@@ -99,11 +100,10 @@ class DnsPacket
         }
 
         // Counts for each of the record types.
-        int qdCount = (packet[this->position + 4] << 8) + packet[this->position + 5];
+        dns.qdcount = (packet[this->position + 4] << 8) + packet[this->position + 5];
         dns.ancount = (packet[this->position + 6] << 8) + packet[this->position + 7];
 
-        // Skip questions
-        this->position = this->position + 12 + (qdCount * 4);
+        this->position += 12;
 
         // Parse answer records
         this->parseRRSet(idPos);
@@ -116,6 +116,19 @@ class DnsPacket
     // Return 0 on error, the new 'pos' in the packet otherwise.
     void parseRRSet(uint32_t idPos)
     {
+        // Skip questions
+        for (int i = 0; i < this->dns.qdcount; i++)
+        {
+            DnsRR current(this->position, idPos, &(this->header), this->packet);
+            this->position = current.SkipQuestion();
+
+            if (this->position == 0)
+            {
+                LOGGING("Error occured when RR question skiping");
+                return;
+            }
+        }
+
         for (int i = 0; i < this->dns.ancount; i++)
         {
             // Create and clear the data in a new dnsRR object.
@@ -123,13 +136,13 @@ class DnsPacket
             current.name = ""; 
             current.data = "";
 
-            this->position = current.ParseRR();
+            this->position = current.ParseRRAnswer();
 
             // If a non-recoverable error occurs when parsing an rr, 
             // we can only return what we've got and give up.
             if (this->position == 0)
             {
-                LOGGING("Error occured when RR parsing")
+                LOGGING("Error occured when RR answer parsing");
                 return;
             }
             this->dns.answers.push_front(current);

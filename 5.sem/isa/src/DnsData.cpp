@@ -16,6 +16,7 @@ class DnsData
         uint8_t rcode;
         uint8_t opcode;
         uint16_t ancount;
+        uint16_t qdcount;
         list<DnsRR> answers;
 
         void AddAnswer(DnsRR answer)

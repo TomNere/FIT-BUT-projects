@@ -84,9 +84,19 @@ class RecordCollection
                     (*it).AddRecord();
                     return;
                 }
+            }
 
-                DnsRecord dnsR(d, rrt, rrn, rra);
-                this->innerList.push_front(dnsR);
+            DnsRecord dnsR(d, rrt, rrn, rra);
+            this->innerList.push_front(dnsR);
+        }
+
+        void PrintRecords()
+        {
+            list <DnsRecord> :: iterator it; 
+        
+            for(it = innerList.begin(); it != innerList.end(); it++) 
+            {
+                cout << it->GetString();
             }
         }
 };
@@ -190,6 +200,10 @@ void logInterface(string strInterface, string strLog, string strTime)
 void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, const uint8_t* origPacket)
 {
     LOGGING("Handling packet " << packetCount++);
+    // if (packetCount != 3)
+    // {
+    //     return;
+    // }
 
     uint32_t currentPos = 0;
     ipInfo ip;
@@ -199,9 +213,10 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
     packet.Parse();
 
     list <DnsRR> :: iterator it; 
-        
+    
     for(it = packet.dns.answers.begin(); it != packet.dns.answers.end(); it++) 
     {
+        cout << "Adding answer with data: " << it->data << endl;
         allRecords.AddRecord(it->name, it->type, it->rrName, it->data);
     }
     
@@ -280,6 +295,7 @@ int main(int argc, char const *argv[])
         logFile(params.file, params.syslogServer);
     }
 
+    allRecords.PrintRecords();
     return 0;
 }
 

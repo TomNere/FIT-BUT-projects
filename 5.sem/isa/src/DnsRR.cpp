@@ -19,6 +19,7 @@ class DnsRR
         uint32_t nameLen = 0;
         uint32_t steps = 0;
         string name;
+        cout << this->position << " "<< this->header->len << " " << this->idPos << endl;
 
         // Scan through the name, one character at a time. We need to look at 
         // each character to look for values we can't print in order to allocate
@@ -45,7 +46,10 @@ class DnsRR
                     {
                         return 0;
                     }
-                    if (endPos == 0) endPos = pos + 1;
+                    if (endPos == 0)
+                    {
+                        endPos = pos + 1;
+                    }
                     pos = idPos + ((c & 0x3f) << 8) + packet[pos+1];
                     next = pos;
                 } 
@@ -77,12 +81,16 @@ class DnsRR
         // be possible for the name to be that long.
         if (steps >= 2 * this->header->len || pos >= this->header->len)
         {
-            return NULL;
+            return "";
         }
 
         nameLen++;
 
-        name = (char*) malloc(sizeof(char)* nameLen ) ;
+        for (int i = 0; i <= nameLen; i++)
+        {
+            name += '\0';
+        }
+
         pos = this->position;
 
         //Now actually assemble the name.
@@ -147,29 +155,52 @@ class DnsRR
         {
             case 1:
                 this->rrName = "A";
+                this->parserA();
+                break;
             case 28:
                 this->rrName = "AAAA";
+                this->parserAAAA();
+                break;
             case 5:
                 this->rrName = "CNAME";
+                this->parserDOMAIN_NAME();
+                break;
             case 15:
                 this->rrName = "MX";
+                this->parserMX();
+                break;
             case 2:
                 this->rrName = "NS";
+                this->parserDOMAIN_NAME();
+                break;
             case 6:
                 this->rrName = "SOA";
+                this->parserSOA();
+                break;
             case 16:
                 this->rrName = "TXT";
+                this->parserTXT();
+                break;
             case 99:
                 this->rrName = "SPF";
+                // TODO
             // DNSSEC
             case 48:
                 this->rrName = "DNSKEY";
+                this->parserDNSKEY();
+                break;
             case 46:
                 this->rrName = "RRSIG";
+                this->parseRRSIG();
+                break;
              case 47:
                 this->rrName = "NSEC";
+                this->parserNSEC();
+                break;
             case 43:
                 this->rrName = "DS";
+                this->parserDS();
+                break;
             default:
                 this->rrName = "Unknown";
         }
@@ -293,7 +324,7 @@ class DnsRR
     // format: flags, proto, algorithm, key
     // All fields except the key are printed as decimal numbers.
     // The key is given in base64.
-    void dnskey()
+    void parserDNSKEY()
     {
         uint16_t flags = (packet[this->position] << 8) + packet[this->position + 1];
         uint8_t proto = packet[this->position + 2];
@@ -312,7 +343,7 @@ class DnsRR
     // All fields except the signer and signature are given as decimal numbers
     // The signer is a standard DNS name
     // The signature is base64 encoded
-    void rrsig()
+    void parseRRSIG()
     {
         uint32_t o_pos = this->position;
         uint16_t tc = (packet[this->position] << 8) + packet[this->position + 1];
@@ -351,7 +382,7 @@ class DnsRR
     // NSEC format.  RFC 4034
     // Format: domain bitmap
     // domain is a DNS name, bitmap is hex escaped
-    void nsec()
+    void parserNSEC()
     {
         string buffer, domain, bitmap;
 
@@ -374,7 +405,7 @@ class DnsRR
     //format: key_tag,algorithm,digest_type,digest
     //The keytag, algorithm, and digest type are given as base 10
     //The digest is base64 encoded
-    void ds()
+    void parserDS()
     {
         uint16_t key_tag = (packet[this->position] << 8) + packet[this->position + 1];
         uint8_t alg = packet[this->position + 2];
@@ -384,6 +415,14 @@ class DnsRR
         stringstream ss;
         ss << key_tag << "," << alg<< "," << dig_type<< "," << digest;
         ss >> this->data;
+    }
+
+    
+    // This data is simply hex escaped
+    // Non printable characters are given as a hex value (\\x30), for example
+    void parserTXT()
+    {
+        this->data = escape_data(this->packet, this->position, this->position + this->rdlength);
     }
 
 
@@ -413,9 +452,24 @@ class DnsRR
         // Parse an individual resource record, placing the acquired data in 'rr'.
         // 'packet', 'pos', and 'idPos' serve the same uses as in parse_rr_set.
         // Return 0 on error, the new 'pos' in the packet otherwise.
-        uint32_t ParseRR()
+        uint32_t SkipQuestion()
         {
-            int i;
+            uint32_t start_pos = this->position; 
+
+            string name = this->readRRName();
+            if (name.empty() || (this->position + 2) >= this->header->len)
+            {
+                return 0;
+            }
+
+            return (this->position + 4);
+        }
+
+        // Parse an individual resource record, placing the acquired data in 'rr'.
+        // 'packet', 'pos', and 'idPos' serve the same uses as in parse_rr_set.
+        // Return 0 on error, the new 'pos' in the packet otherwise.
+        uint32_t ParseRRAnswer()
+        {
             uint32_t rr_start = this->position;
 
             this->name = "";
@@ -441,7 +495,7 @@ class DnsRR
 
             this->cls = (packet[this->position + 2] << 8) + packet[this->position + 3];
             this->ttl = 0;
-            for (i=0; i<4; i++)
+            for (int i = 0; i < 4; i++)
             {
                 this->ttl = (this->ttl << 8) + packet[this->position + 4 + i];
             }
