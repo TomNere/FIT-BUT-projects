@@ -5,7 +5,12 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <list>
+#include <pthread.h>
 #include <iterator>
+#include <sys/socket.h> // Sockets
+#include <netdb.h>      // gethostbyname...
+#include <ctime>
+
 
 #include <err.h>
 
@@ -15,11 +20,61 @@
 #include "DnsRecord.cpp"
 
 using namespace std;
+
+/********************************************************** GLOBALS *************************************************************/
+
 uint32_t packetCount = 0;
 list<DnsRecord> recordList;
 
+/*********************************************************** MAIN ***************************************************************/
+
+// void* call_from_thread(void*)
+// {
+//     while(true)
+//     {
+//         usleep(1000000);
+//         cout << "Launched by thread" << endl;
+//         writeStats();
+//     }
+    
+//     return NULL;
+// }
+
+// Main function
+int main(int argc, char const *argv[])
+{
+    // Handle SIUGSR1
+    signal(SIGUSR1, handleSig);
+
+    // Parse arguments
+    rawParameters params = parseArg(argc, argv);
+
+    if (params.interface.compare(""))
+    {
+         //pthread_t t;
+         //pthread_create(&t, NULL, call_from_thread, NULL);
+
+        logInterface(params.interface, params.syslogServer, params.time);
+         //pthread_join(t, NULL);
+        
+    }
+
+    if (params.file.compare(""))
+    {
+        logFile(params.file, params.syslogServer);
+    }
+
+    return 0;
+}
 
 /********************************************************** METHODS **********************************************************/
+
+// Signal handler
+// Write stats end terminate
+void handleSig(int sigNum)
+{
+    writeStats();
+}
 
 // Write stats to stdout
 void writeStats()
@@ -32,11 +87,118 @@ void writeStats()
     }
 }
 
-// Signal handler
-// Write stats end terminate
-void handleSig(int sigNum)
+// Returns the local date/time formatted as 2014-03-19 11:11:52
+// https://stackoverflow.com/questions/7411301/how-to-introduce-date-and-time-in-log-file
+string getFormattedTime()
 {
-    writeStats();
+    timeval curTime;
+    gettimeofday(&curTime, NULL);
+    int milli = curTime.tv_usec / 1000;
+
+    char buffer [80];
+    strftime(buffer, 80, "%Y-%m-%dT%H:%M:%S", localtime(&curTime.tv_sec));
+
+    char currentTime[84] = "";
+    sprintf(currentTime, "%s.%03dZ", buffer, milli);
+    return currentTime;
+
+    // time_t rawtime;
+    // struct tm* timeinfo;
+
+    // time(&rawtime);
+    // timeinfo = localtime(&rawtime);
+    // int milli = timeinfo->tv_usec / 1000;
+
+    // // Must be static, otherwise won't work
+    // static char _retval[20];
+    // strftime(_retval, sizeof(_retval), "%Y-%m-%dT%H:%M:%S", timeinfo);
+
+    // return _retval;
+}
+
+string getHostname()
+{
+    char name [1024] = "";
+    const int result = gethostname(name, sizeof name);
+    LOGGING("hostname result: " << result);
+    return name;
+}
+
+list<string> getMessages()
+{
+    list<string> messages = {""};
+    string message = "";
+
+    // Create iterator pointing to first element
+    list<DnsRecord>::iterator it;
+
+    for (it = recordList.begin(); it != recordList.end(); it++)
+    {
+        string record = it->GetString();
+
+        if ((record + message).size() > MESSAGE_SIZE)
+        {
+            message = "<134>1 " + getFormattedTime() + " " + getHostname() + " dns-export - - - " + message;
+            messages.push_front(message);
+            message = "";
+        }
+        message += record;
+    }
+    return messages;
+}
+
+void sendStats(string strLog)
+{
+    // Create socket
+    int sock;
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
+    {
+        ERR_RET("Syslog - socket creating error!")
+    }
+
+    // Set timeout
+    // (https://stackoverflow.com/questions/30395258/setting-timeout-to-recv-function)
+    struct timeval tv;
+    tv.tv_sec = 5;          // 5 Secs Timeout
+    tv.tv_usec = 0;         // Not init'ing this can cause strange errors
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+
+    LOGGING("Server address: " << strLog);
+
+    // Get network host entry
+    struct hostent* server;
+    if ((server = gethostbyname(strLog.c_str())) == NULL)
+    {
+        ERR_RET("Syslog - host not found!");
+    }
+    
+    // Create necessary structures
+    struct sockaddr_in server_address;
+    bzero((char*) &server_address, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    bcopy((char*)server->h_addr, (char*)&server_address.sin_addr.s_addr, server->h_length);
+    server_address.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
+    LOGGING("Syslog address: " << server_address.sin_addr.s_addr << " port:" << server_address.sin_port);
+    // Connect
+    if ((connect(sock, (const struct sockaddr*)&server_address, sizeof(server_address))) != 0)
+    {
+        ERR_RET("Syslog - connection error!");
+    }
+
+    // Get and send mesagges
+    list<string>messages = getMessages();
+    list<string>::iterator it;
+
+    for (it = messages.begin(); it != messages.end(); it++)
+    {
+        int bytestx = send(sock, it->c_str(), it->length() + 1, 0);      // + 1 for '\0' character 
+        if (bytestx < 0)
+        {
+            ERR_RET("Syslog - sending error!");
+        }
+    }
+    
+    close(sock);           // Close socket
 }
 
 // Argument parser
@@ -149,7 +311,6 @@ void logFile(string strFile, string strLog)
         ERR_RET("Unable to open pcap file. Error:" << errBuf);
     }
 
-
     if (pcap_loop(pcapFile, -1, pcapHandler, NULL) < 0)
     {
         pcap_close(pcapFile);
@@ -157,6 +318,15 @@ void logFile(string strFile, string strLog)
     }
 
     pcap_close(pcapFile);
+    
+    if (!strLog.compare(""))
+    {
+        writeStats();
+    }
+    else
+    {
+        sendStats(strLog);
+    }
 }
 
 /*********************************************************** PCAP FILE ***************************************************************/
@@ -199,31 +369,4 @@ void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, c
             recordList.push_front(dnsR);
         }
     }
-}
-
-
-
-/*********************************************************** MAIN ***************************************************************/
-
-// Main function
-int main(int argc, char const *argv[])
-{
-    // Handle SIUGSR1
-    signal(SIGUSR1, handleSig);
-
-    // Parse arguments
-    rawParameters params = parseArg(argc, argv);
-
-    if (params.interface.compare(""))
-    {
-        logInterface(params.interface, params.syslogServer, params.time);
-    }
-
-    if (params.file.compare(""))
-    {
-        logFile(params.file, params.syslogServer);
-    }
-
-    writeStats();
-    return 0;
 }

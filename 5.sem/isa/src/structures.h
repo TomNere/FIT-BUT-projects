@@ -24,6 +24,9 @@ const string help = "Invalid parameters!\n\n"
 #define IPv4 0x04
 #define IPv6 0x06
 
+#define SYSLOG_PORT 514
+#define MESSAGE_SIZE 900
+
 #define UDP 0x11
 #define TCP 0x06
 
@@ -50,15 +53,6 @@ const string reset("\033[0m");
 #define LOGGING(message) \
     cerr << yellow << "LOG: " <<   \
     message << reset << endl;
-
-// Structure representing parameters of running program in raw string format
-typedef struct
-{
-    string file;
-    string interface;
-    string syslogServer;
-    string time;
-} rawParameters;
 
 /////////////////////////////////////////////////////////////////
 
