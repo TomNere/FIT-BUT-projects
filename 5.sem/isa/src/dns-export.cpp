@@ -144,6 +144,9 @@ list<string> getMessages()
         }
         message += record;
     }
+    message = "<134>1 " + getFormattedTime() + " " + getHostname() + " dns-export - - - " + message;
+    messages.push_front(message);
+    
     return messages;
 }
 
