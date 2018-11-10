@@ -1,5 +1,5 @@
-#include "DnsData.cpp"
 #include "structures.h"
+#include "DnsRR.cpp"
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -14,61 +14,67 @@
 
 using namespace std;
 
+/*********************************************** Consts ********************************************/
+
+#define UDP 0x11
+#define TCP 0x06
+
+// Class holding (maybe) DNS packet
 class DnsPacket
 {
+    /*********************************************** PRIVATE Variables ********************************************/
+    
     uint8_t* packet;
     struct pcap_pkthdr header;
     uint32_t position;
-    int protType;
-    uint32_t transProt;
-    int qdCount;
+    uint16_t ancount;
 
-    uint32_t getTransProt()
+    /*********************************************** PRIVATE Methods ********************************************/
+
+    // Parse ethernet and transport protocol
+    // Return true if success
+    bool getTransProt()
     {
         struct ether_header* eptr;
         struct ip* myIp;
         struct ip6_hdr* myIpv6;
+        uint8_t transProtType;
 
-        // read the Ethernet header
+        // Read the ethernet header
         eptr = (struct ether_header*) packet;
         this->position += sizeof(struct ether_header);
 
-        // parse ethernet type 
+        // Check ethernet type 
         switch (ntohs(eptr->ether_type))
-        {               
-            // see /usr/include/net/ethernet.h for types
+        {
+            // see /usr/include/net/ethernet.h for types (ip, ip6_header...)
             case ETHERTYPE_IP:
-                LOGGING("Ethernet type is IPv4");
-                myIp = (struct ip*) (packet + this->position);              // skip Ethernet header
-                this->position += sizeof(struct ip);
-                this->protType = myIp->ip_p;
+                myIp = (struct ip*)(packet + this->position);              
+                this->position += sizeof(struct ip);                // skip Ethernet IP header
+                transProtType = myIp->ip_p;
                 break;
-
             case ETHERTYPE_IPV6:
-                LOGGING("Ethernet type is IPv6");
-                myIpv6 = (struct ip6_hdr*) (packet + this->position);
-                this->position += sizeof(struct ip6_hdr);
-                this->protType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+                myIpv6 = (struct ip6_hdr*)(packet + this->position);
+                this->position += sizeof(struct ip6_hdr);           // skip Ethernet IPv6 header
+                transProtType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
                 break;
             default:
-                LOGGING("Invalid ethernet type for DNS: " << ntohs(eptr->ether_type));
-                return 0;
+                return false;       // Unsupported
         }
 
-        switch (protType)
+        // Skip position according to transport protocol type
+        switch (transProtType)
         {
             case UDP:
-                LOGGING("Transport protocol UDP");
                 this->position += sizeof(struct udphdr);
-                return UDP;
+                break;
             case TCP: 
-                LOGGING("Transport protocol TCP");
                 this->position += sizeof(struct tcphdr);
-                return TCP;
-            default: 
-                LOGGING("Invalid transport protocol for DNS");
-                return 0;
+            default:
+                return false;       // Unsupported
         }
+
+        return true;
     }
 
     // Parse the dns protocol in 'packet'
@@ -76,67 +82,83 @@ class DnsPacket
     // See dns_parse.h for more info
     void dnsParse()
     {
-        uint32_t idPos = this->position;
+        //  The header contains the following fields:
+        //
+        //                                 1  1  1  1  1  1
+        //   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |                      ID                       |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |                    QDCOUNT                    |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |                    ANCOUNT                    |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |                    NSCOUNT                    |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        // |                    ARCOUNT                    |
+        // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
+        // Check if DNS header is 12 bytes long
+        // 2 byte ID, 2 bytes of flags, and 4 x 2 bytes of counts.
         if (this->header.len - this->position < 12)
         {
-            LOGGING("Truncated Packet(dns). Skipping");
-            return;
+            return;     // Skip this packet...
         }
 
-        //uint8_t* new_packet = &(this->packet);
+        // Store ID position for future use when name is compressed
+        uint32_t idPos = this->position;
 
-        dns.id = (packet[this->position] << 8) + packet[this->position + 1];
-        dns.qr = packet[this->position + 2] >> 7;
-        dns.AA = (packet[this->position + 2] & 0x04) >> 2;
-        dns.TC = (packet[this->position + 2] & 0x02) >> 1;
-        dns.rcode = packet[this->position + 3] & 0x0f;
-
-        // rcodes > 5 indicate various protocol errors and redefine most of the 
-        // remaining fields. Parsing this would hurt more than help. 
-        if (dns.rcode > 5) {
-            LOGGING("Rcode > 5. Skipping");
-            return;
+        // Check if flags are valid for DNS packet
+        // we don't care about ID (by design), qr is after 2 byte ID
+        // need bitshift because QR is one bit
+        uint8_t qr = packet[this->position + 2] >> 7;
+        if (qr == 0)
+        {
+            return;     // Message is query, skip
+        }
+        
+        // Check rcode for errors
+        // need & because rcode has size 4 bits
+        uint8_t rcode = packet[this->position + 3] & 0b00001111;
+        if (rcode > 5)
+        {
+            return;     // > 5 signalize errors
         }
 
-        // Counts for each of the record types.
-        dns.qdcount = (packet[this->position + 4] << 8) + packet[this->position + 5];
-        dns.ancount = (packet[this->position + 6] << 8) + packet[this->position + 7];
 
-        this->position += 12;
+        // Question count 
+        uint16_t qdcount = packet[this->position + 5];
+        if (qdcount != 1)
+        {
+            return;     // question count other than 1 in DNS packet is very weird
+        }
+
+        // Answer count, other counts are useless for us
+        this->ancount = packet[this->position + 7];
+
+        this->position += 12;   // Set possition after header
 
         // Parse answer records
         this->parseRRSet(idPos);
     }
 
-    // Parse a set of resource records in the dns protocol in 'packet', starting
-    // at 'pos'. The 'idPos' offset is necessary for putting together 
-    // compressed names. 'count' is the expected number of records of this type.
-    // 'root' is where to assign the parsed list of objects.
-    // Return 0 on error, the new 'pos' in the packet otherwise.
+    // Skip question and parse answers
     void parseRRSet(uint32_t idPos)
     {
-        // Skip questions
-        for (int i = 0; i < this->dns.qdcount; i++)
-        {
-            DnsRR current(this->position, idPos, &(this->header), this->packet);
-            this->position = current.SkipQuestion();
+        // Skip question section because we don't need it's data
+        this->SkipQuestion();
 
-            if (this->position == 0)
-            {
-                LOGGING("Error occured when RR question skiping");
-                return;
-            }
-        }
-
-        for (int i = 0; i < this->dns.ancount; i++)
+        // Parse answers
+        for (int i = 0; i < this->ancount; i++)
         {
             // Create and clear the data in a new dnsRR object.
             DnsRR current(this->position, idPos, &(this->header), this->packet);
             current.name = ""; 
             current.data = "";
 
-            this->position = current.ParseRRAnswer();
+            this->position = current.ParseRR();
 
             // If a non-recoverable error occurs when parsing an rr, 
             // we can only return what we've got and give up.
@@ -145,13 +167,41 @@ class DnsPacket
                 LOGGING("Error occured when RR answer parsing");
                 return;
             }
-            this->dns.answers.push_front(current);
+            this->Answers.push_front(current);
         }
     }
 
-    public:
-        DnsData dns;
+    // Skip Question section
+    void SkipQuestion()
+    {
+        //  Question section contains the following fields:
+        //                                    1  1  1  1  1  1
+        //      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+        //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //    |                                               |
+        //    /                     QNAME                     /
+        //    /                                               /
+        //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //    |                     QTYPE                     |
+        //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //    |                     QCLASS                    |
+        //    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //
+        // Qname contains labels, there's no compression so we can read bytes until "0" label occures
+        while(this->packet[this->position++] != 0)
+        {
+            ;
+        }
+        // Skip 2 byte long qtype and 2 byte long qclass
+        this->position += 4);
+    }
 
+    /****************************************** PUBLIC Variables and Methods ****************************************/
+
+    public:
+        list<DnsRR> Answers;
+
+        // Initialize packet, header and position in constructor
         DnsPacket(const uint8_t* p, const struct pcap_pkthdr* h)
         {
             this->packet = (uint8_t*) p;
@@ -161,26 +211,12 @@ class DnsPacket
             this->position = 0;
         }
 
+        // Try to parse packet
         void Parse()
         {
-            this->protType = this->getTransProt();
-
-            switch (this->protType)
+            if (this->getTransProt())
             {
-                case UDP:
-                    this->dnsParse();
-
-                    if (this->position != 0)
-                    {
-                        //printSummary(&ip, &dns, &header);
-                    }
-                    break;
-                case TCP:
-                    // TODO
-                    LOGGING("TCP not implemented yet");
-                    break;
-                default:
-                    return;
+                this->dnsParse();
             }
         }
 };

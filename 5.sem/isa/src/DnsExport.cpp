@@ -15,7 +15,6 @@
 
 #include <err.h>
 
-#include "dns-export.h"
 #include "structures.h"
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
@@ -30,7 +29,8 @@ list<DnsRecord> recordList;
 // pcap_t structure better here for easy signal handling such as recordList
 pcap_t* myPcap;
 
-
+// Main class
+// Parse arguments and run sniffer
 class DnsExport
 {
     /*********************************************** PRIVATE Variables ********************************************/
@@ -190,9 +190,9 @@ class DnsExport
         dnsPacket.Parse();
 
         // Add answers to record list if exist
-        if (dnsPacket.dns.answers.size() > 0)
+        if (dnsPacket.Answers.size() > 0)
         {
-            addRecords(dnsPacket.dns.answers);
+            addRecords(dnsPacket.Answers);
         }
     }
 

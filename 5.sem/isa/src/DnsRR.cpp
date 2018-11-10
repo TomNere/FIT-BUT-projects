@@ -8,9 +8,11 @@
 
 using namespace std;
 
-// Holds the information for a dns resource record.
+// Holds the information for a dns resource record
+// Only used for answers in our case
 class DnsRR
 {
+    /*********************************************** PRIVATE Methods ********************************************/
     string readRRName()
     {
         uint32_t i, next, pos;
@@ -19,7 +21,6 @@ class DnsRR
         uint32_t nameLen = 0;
         uint32_t steps = 0;
         string name = "";
-        cout << this->position << " "<< this->header->len << " " << this->idPos << endl;
 
         // Scan through the name, one character at a time. We need to look at 
         // each character to look for values we can't print in order to allocate
@@ -85,7 +86,6 @@ class DnsRR
         }
 
         nameLen++;
-        cout << "nameLen" << nameLen << endl;
         for (int i = 0; i < nameLen; i++)
         {
             name += '\0';
@@ -226,7 +226,6 @@ class DnsRR
 
         ss << (int)packet[this->position] << "." << (int)packet[this->position + 1] << "." << (int)packet[this->position + 2] << "." << (int)packet[this->position + 3];
         ss >> this->data;
-        cout << "parserA data: " << this->data << endl;
     }
 
     // domain name like format
@@ -456,31 +455,11 @@ class DnsRR
             this->packet = pt;
         }
 
-        // Parse an individual resource record, placing the acquired data in 'rr'.
-        // 'packet', 'pos', and 'idPos' serve the same uses as in parse_rr_set.
-        // Return 0 on error, the new 'pos' in the packet otherwise.
-        uint32_t SkipQuestion()
-        {
-            uint32_t start_pos = this->position; 
-
-            string name = this->readRRName();
-            if (name.empty() || (this->position + 2) >= this->header->len)
-            {
-                return 0;
-            }
-
-            return (this->position + 4);
-        }
-
-        // Parse an individual resource record, placing the acquired data in 'rr'.
-        // 'packet', 'pos', and 'idPos' serve the same uses as in parse_rr_set.
-        // Return 0 on error, the new 'pos' in the packet otherwise.
-        uint32_t ParseRRAnswer()
+        // Parse resource records
+        // Return 0 if error occures
+        uint32_t ParseRR()
         {
             uint32_t rr_start = this->position;
-
-            this->name = "";
-            this->data = "";
 
             this->name = this->readRRName();
     
@@ -528,7 +507,6 @@ class DnsRR
             //        rr->rdlength);
             // fprintf(stderr, "rr->data %s\n", rr->data);
 
-            cout << "returning pos: " << this->position << " rdlength: " << this->rdlength << endl;
             return this->position + this->rdlength;
         }
 };

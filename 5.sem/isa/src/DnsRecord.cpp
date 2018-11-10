@@ -13,7 +13,6 @@ class DnsRecord
 	uint count;
 
     public:
-
         DnsRecord(string d, uint32_t rrt, string rrn, string rra)
         {
             this->domain = d;

@@ -1,6 +1,0 @@
-rrtype: Unknown , count: 87717 type int: 0
-rrtype: Unknown , count: 87717 type int: 0
-rrtype: Unknown , count: 87717 type int: 1
-rrtype: Unknown , count: 87717 type int: 1
-rrtype: Unknown , count: 106317 type int: 0
-rrtype: Unknown , count: 106317 type int: 0
