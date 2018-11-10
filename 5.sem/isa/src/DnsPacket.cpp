@@ -152,12 +152,12 @@ class DnsPacket
     public:
         DnsData dns;
 
-        DnsPacket(const uint8_t* p, struct pcap_pkthdr h)
+        DnsPacket(const uint8_t* p, const struct pcap_pkthdr* h)
         {
             this->packet = (uint8_t*) p;
-            this->header.ts = h.ts;
-            this->header.caplen = h.caplen;
-            this->header.len = h.len;
+            this->header.ts = h->ts;
+            this->header.caplen = h->caplen;
+            this->header.len = h->len;
             this->position = 0;
         }
 

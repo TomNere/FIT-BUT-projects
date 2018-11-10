@@ -22,6 +22,15 @@
 
 using namespace std;
 
+/*************************************************** STATICS ******************************************************/
+
+// List collecting all stats to print/send
+list<DnsRecord> recordList;
+
+// pcap_t structure better here for easy signal handling such as recordList
+pcap_t* myPcap;
+
+
 class DnsExport
 {
     /*********************************************** PRIVATE Variables ********************************************/
@@ -35,13 +44,7 @@ class DnsExport
     // For debugging
     uint32_t packetCount = 0;
 
-    // List collecting all stats to print/send
-    list<DnsRecord> recordList;
-
-    // Pcap stuff
-    pcap_t* myPcap;
     char errBuf[PCAP_ERRBUF_SIZE];
-
 
     /*********************************************** PRIVATE Methods ********************************************/
 
@@ -94,15 +97,15 @@ class DnsExport
     }
 
     // Signal handler for SIGUSR1 writing stats to stdout
-    void handleSig(int sigNum)
+    static void handleSig(int sigNum)
     {
-        this->writeStats();
+        writeStats();
     }
 
     // Write stats to stdout
-    void writeStats()
+    static void writeStats()
     {
-        list <DnsRecord> :: iterator it; 
+        list<DnsRecord>::iterator it; 
 
         for(it = recordList.begin(); it != recordList.end(); it++) 
         {
@@ -133,39 +136,39 @@ class DnsExport
     }
 
     // Interface sniffer
-    void logInterface()
+    void sniffInterface()
     {
         // Open device for sniffing
-        if ((this->myPcap = pcap_open_live(this->interface.c_str(), BUFSIZ, true, 0, this->errBuf)) == NULL)
+        if ((myPcap = pcap_open_live(this->interface.c_str(), BUFSIZ, true, 0, this->errBuf)) == NULL)
         {
             ERR_RET("Unable to open interface for listening. Error: " << errBuf);
         }
 
         // Start sniffing forever...
-        if (pcap_loop(this->myPcap, -1, this->pcapHandler, NULL) < 0)
+        if (pcap_loop(myPcap, -1, pcapHandler, NULL) < 0)
         {
-            pcap_close(this->myPcap);
+            pcap_close(myPcap);
             ERR_RET("Error occured when sniffing.");
         }
     }
 
     // File sniffer
-    void logFile()
+    void sniffFile()
     {
         // Open file for sniffing
-        if ((this->myPcap = pcap_open_offline(this->file.c_str(), this->errBuf)) == NULL)
+        if ((myPcap = pcap_open_offline(this->file.c_str(), this->errBuf)) == NULL)
         {
             ERR_RET("Unable to open pcap file. Error:" << errBuf);
         }
 
         // Sniff file
-        if (pcap_loop(this->myPcap, -1, this->pcapHandler, NULL) < 0)
+        if (pcap_loop(myPcap, -1, this->pcapHandler, NULL) < 0)
         {
-            pcap_close(this->myPcap);
+            pcap_close(myPcap);
             ERR_RET("Error occured when reading pcap file.");
         }
 
-        pcap_close(this->myPcap);
+        pcap_close(myPcap);
 
         // Send stats if syslog server defined, write to stdout otherwise
         if (!this->syslogServer.compare(""))
@@ -180,25 +183,26 @@ class DnsExport
 
     // This callback is called in pcap_loop for each packet
     // Parse packet and add stats if valid and supported DNS packet
-    void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* origHeader, const uint8_t* origPacket)
+    static void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* header, const uint8_t* packet)
     {
-        LOGGING("Handling packet " << packetCount++);
-        // if (packetCount != 3)
-        // {
-        //     return;
-        // }
+        // Create object and try to parse
+        DnsPacket dnsPacket(packet, header);
+        dnsPacket.Parse();
 
-        uint32_t currentPos = 0;
-
-
-        DnsPacket packet(origPacket, *origHeader);
-        packet.Parse();
-
-        list <DnsRR> :: iterator it; 
-
-        for (it = packet.dns.answers.begin(); it != packet.dns.answers.end(); it++) 
+        // Add answers to record list if exist
+        if (dnsPacket.dns.answers.size() > 0)
         {
-            list <DnsRecord> :: iterator it2; 
+            addRecords(dnsPacket.dns.answers);
+        }
+    }
+
+    // Add dns answers to record list
+    static void addRecords(list<DnsRR> answerList)
+    {
+        list<DnsRR>::iterator it; 
+        for (it = answerList.begin(); it != answerList.end(); it++) 
+        {
+            list<DnsRecord>::iterator it2; 
 
             bool added = false;
             for (it2 = recordList.begin(); it2 != recordList.end(); it2++) 
@@ -213,51 +217,43 @@ class DnsExport
 
             if (!added)
             {
-                DnsRecord dnsR(it->name, it->type, it->rrName, it->data);
-                recordList.push_front(dnsR);
+                DnsRecord dnsRR(it->name, it->type, it->rrName, it->data);
+                recordList.push_front(dnsRR);
             }
         }
     }
 
-    void sendStats(string strLog)
+    // Send stats to syslog server (TCP)
+    void sendStats()
     {
         // Create socket
         int sock;
         if ((sock = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
         {
-            ERR_RET("Syslog - socket creating error!")
+            ERR_RET("Syslog - socket creating error!");
         }
-
-        // Set timeout
-        // (https://stackoverflow.com/questions/30395258/setting-timeout-to-recv-function)
-        struct timeval tv;
-        tv.tv_sec = 5;          // 5 Secs Timeout
-        tv.tv_usec = 0;         // Not init'ing this can cause strange errors
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
-
-        LOGGING("Server address: " << strLog);
 
         // Get network host entry
         struct hostent* server;
-        if ((server = gethostbyname(strLog.c_str())) == NULL)
+        if ((server = gethostbyname(this->syslogServer.c_str())) == NULL)
         {
             ERR_RET("Syslog - host not found!");
         }
 
         // Create necessary structures
-        struct sockaddr_in server_address;
-        bzero((char*) &server_address, sizeof(server_address));
-        server_address.sin_family = AF_INET;
-        bcopy((char*)server->h_addr, (char*)&server_address.sin_addr.s_addr, server->h_length);
-        server_address.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
-        LOGGING("Syslog address: " << server_address.sin_addr.s_addr << " port:" << server_address.sin_port);
-        // Connect
-        if ((connect(sock, (const struct sockaddr*)&server_address, sizeof(server_address))) != 0)
+        struct sockaddr_in serverAddress;
+        bzero((char*) &serverAddress, sizeof(serverAddress));
+        serverAddress.sin_family = AF_INET;
+        bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
+        serverAddress.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
+
+        // Connect to syslog
+        if ((connect(sock, (const struct sockaddr*)&serverAddress, sizeof(serverAddress))) != 0)
         {
-            ERR_RET("Syslog - connection error!");
+            ERR_RET("Syslog - TCP connection error!");
         }
 
-        // Get and send mesagges
+        // Get and send all mesagges
         list<string>messages = getMessages();
         list<string>::iterator it;
 
@@ -273,32 +269,37 @@ class DnsExport
         close(sock);           // Close socket
     }
 
+    // Return statistics formated as syslog messages
     list<string> getMessages()
     {
-        list<string> messages = {""};
-        string message = "";
-
+        // Get hostname
         string hostname;
         char tmp [1024] = "";
         const int result = gethostname(tmp, sizeof tmp);
         hostname = tmp;
 
-        // Create iterator pointing to first element
+        list<string> messages = {""};
+        string message = "";
+
+        // Create list of all messages
         list<DnsRecord>::iterator it;
 
         for (it = recordList.begin(); it != recordList.end(); it++)
         {
             string record = it->GetString();
 
+            // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
             {
-                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
-                messages.push_front(message);
+                message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+                messages.push_front(message);       // front or back? Doesn't matter...
                 message = "";
             }
             message += record;
         }
-        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+
+        // At the end add last message to the list
+        message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
         messages.push_front(message);
 
         return messages;
@@ -347,7 +348,7 @@ class DnsExport
         int Main()
         {
             // Handle SIUGSR1
-            signal(SIGUSR1, this->handleSig);
+            signal(SIGUSR1, handleSig);
 
             // Choose what to do
             if (this->interface.compare(""))
@@ -355,16 +356,16 @@ class DnsExport
                 //pthread_t t;
                 //pthread_create(&t, NULL, call_from_thread, NULL);
 
-                this->logInterface();
+                this->sniffInterface();
                 //pthread_join(t, NULL);
 
             }
 
             if (this->file.compare(""))
             {
-                this->logFile(this->file, this->syslogServer);
+                this->sniffFile();
             }
 
             return 0;
         }   
-}  
+};
