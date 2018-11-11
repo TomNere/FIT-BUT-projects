@@ -12,145 +12,84 @@ using namespace std;
 // Only used for answers in our case
 class DnsRR
 {
+    /*********************************************** PRIVATE Variables ********************************************/
+
+    uint16_t cls;
+    uint16_t ttl;
+    uint16_t rdlength;
+
+    uint32_t position;
+    uint32_t idPosition;
+    struct pcap_pkthdr header;
+    uint8_t* packet;
+
     /*********************************************** PRIVATE Methods ********************************************/
-    string readRRName()
+
+    // Return domain name
+    string readDomainName(uint32_t* position)
     {
-        uint32_t i, next, pos;
-        pos = this->position;
-        uint32_t endPos = 0;
-        uint32_t nameLen = 0;
-        uint32_t steps = 0;
+        uint32_t pos;
+        pos = *position;
         string name = "";
-
-        // Scan through the name, one character at a time. We need to look at 
-        // each character to look for values we can't print in order to allocate
-        // extra space for escaping them.  'next' is the next position to look
-        // for a compression jump or name end.
-        // It's possible that there are endless loops in the name. Our protection
-        // against this is to make sure we don't read more bytes in this process
-        // than twice the length of the data.  Names that take that many steps to 
-        // read in should be impossible.
-        next = pos;
-        while (pos < this->header->len && !(next == pos && this->packet[pos] == 0) && steps < this->header->len * 2)
+        
+        while (packet[pos] != 0)
         {
-            uint8_t c = packet[pos];
-            steps++;
-            if (next == pos)
+            uint8_t ch = packet[pos];
+            
+            if ((ch >> 6) == 0b11)          // Check for compression (first two bits enabled)
             {
-                // Handle message compression.  
-                // If the length byte starts with the bits 11, then the rest of
-                // this byte and the next form the offset from the dns proto start
-                // to the start of the remainder of the name.
-                if ((c & 0xc0) == 0xc0)
-                {
-                    if (pos + 1 >= this->header->len)
-                    {
-                        return 0;
-                    }
-                    if (endPos == 0)
-                    {
-                        endPos = pos + 1;
-                    }
-                    pos = idPos + ((c & 0x3f) << 8) + packet[pos+1];
-                    next = pos;
-                } 
-                else 
-                {
-                    nameLen++;
-                    pos++;
-                    next = next + c + 1; 
-                }
-            } 
-            else 
-            {
-                if (c >= '!' && c <= 'z' && c != '\\')
-                {
-                    nameLen++;
-                }
-                else nameLen += 4;
-                pos++;
-            }
-        }
-        if (endPos == 0)
-        {
-            endPos = pos;
-        }
+                uint16_t offset = 0;
 
-        // Due to the nature of DNS name compression, it's possible to get a
-        // name that is infinitely long. Return an error in that case.
-        // We use the len of the packet as the limit, because it shouldn't 
-        // be possible for the name to be that long.
-        if (steps >= 2 * this->header->len || pos >= this->header->len)
-        {
-            return "";
-        }
+                // The pointer takes the form of a two octet sequence:
+                //
+                //+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+                //| 1  1|                OFFSET                   |
+                //+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--
 
-        nameLen++;
-        for (int i = 0; i < nameLen; i++)
-        {
-            name += '\0';
-        }
+                offset = ((ch & 0b00111111) << 8) | packet[pos + 1]; // First two bits are offset , length is max 63
+                uint32_t tmp = this->idPosition + offset;
 
-        pos = this->position;
+                string label = this->readDomainName(&tmp);      // Recursion
 
-        //Now actually assemble the name.
-        //We've already made sure that we don't exceed the packet length, so
-        // we don't need to make those checks anymore.
-        // Non-printable and whitespace characters are replaced with a question
-        // mark. They shouldn't be allowed under any circumstances anyway.
-        // Other non-allowed characters are kept as is, as they appear sometimes
-        // regardless.
-        // This shouldn't interfere with IDNA (international
-        // domain names), as those are ascii encoded.
-        next = pos;
-        i = 0;
-        while (next != pos || packet[pos] != 0) 
-        {
-            if (pos == next) 
-            {
-                if ((packet[pos] & 0xc0) == 0xc0) 
-                {
-                    pos = idPos + ((packet[pos] & 0x3f) << 8) + packet[pos+1];
-                    next = pos;
-                } 
-                else
-                {
-                    // Add a period except for the first time.
-                    if (i != 0) name[i++] = '.';
-                    next = pos + packet[pos] + 1;
-                    pos++;
-                }
+                name += label;
+                *position = pos + 2;
+                return name;
             }
             else
             {
-                uint8_t c = packet[pos];
-                if (c >= '!' && c <= '~' && c != '\\')
+                int length = ch & 0b00111111; // First two bits are offset , length is max 63
+                for (int i = 0; i < length; i++)
                 {
-                    name[i] = packet[pos];
-                    i++; pos++;
-                } 
-                else
-                {
-                    name[i] = '\\';
-                    name[i+1] = 'x';
-                    name[i+2] = c/16 + 0x30;
-                    name[i+3] = c%16 + 0x30;
-                    if (name[i+2] > 0x39) name[i+2] += 0x27;
-                    if (name[i+3] > 0x39) name[i+3] += 0x27;
-                    i+=4; 
-                    pos++;
+                    char c = packet[++pos];
+                    if (c >= '!' && c <= '~' && c != '\\')
+                    {
+                        name += c;
+                    } 
+                    else
+                    {
+                        name += '\\';
+                        name += 'x';
+                        char c1 = c/16 + 0x30;
+                        char c2 = c%16 + 0x30;
+                        if (c1 > 0x39) c1 += 0x27;
+                        if (c2 > 0x39) c2 += 0x27;
+                        name += c1;
+                        name += c2;
+                    }
+
                 }
+                name += ".";
+                pos++;
             }
         }
-        name[i] = 0;
 
-        this->position = endPos + 1;
-
-        int index = name.find_first_of('\0');
-        name.resize(index);
-
-        LOGGING("Returning RR name: " << name);
-        name.shrink_to_fit();
+        if (name.size() > 0)
+        {
+            name = name.substr(0, name.size()-1);   // Remove last '.'
+        }
+        
+        *position = pos + 1;
+        
         return name;
     }
 
@@ -159,64 +98,67 @@ class DnsRR
         switch (this->type)
         {
             case 1:
-                this->rrName = "A";
+                this->typeStr  = "A";
                 this->parserA();
                 break;
             case 28:
-                this->rrName = "AAAA";
+                this->typeStr  = "AAAA";
                 this->parserAAAA();
                 break;
             case 5:
-                this->rrName = "CNAME";
+                this->typeStr  = "CNAME";
                 this->parserDOMAIN_NAME();
                 break;
             case 15:
-                this->rrName = "MX";
+                this->typeStr  = "MX";
                 this->parserMX();
                 break;
             case 2:
-                this->rrName = "NS";
+                this->typeStr  = "NS";
                 this->parserDOMAIN_NAME();
                 break;
             case 6:
-                this->rrName = "SOA";
+                this->typeStr  = "SOA";
                 this->parserSOA();
                 break;
             case 16:
-                this->rrName = "TXT";
+                this->typeStr  = "TXT";
                 this->parserTXT();
                 break;
             case 99:
-                this->rrName = "SPF";
+                this->typeStr  = "SPF";
                 // TODO
             // DNSSEC
             case 48:
-                this->rrName = "DNSKEY";
+                this->typeStr  = "DNSKEY";
                 this->parserDNSKEY();
                 break;
             case 46:
-                this->rrName = "RRSIG";
+                this->typeStr  = "RRSIG";
                 this->parseRRSIG();
                 break;
              case 47:
-                this->rrName = "NSEC";
+                this->typeStr  = "NSEC";
                 this->parserNSEC();
                 break;
             case 43:
-                this->rrName = "DS";
+                this->typeStr  = "DS";
                 this->parserDS();
                 break;
             default:
-                this->rrName = "Unknown";
+                this->typeStr  = "Unknown";
         }
     }
 
     /****************************************** RR parsers *****************************************************/
 
-    // A (IPv4 address) format
-    // A records are simply an IPv4 address, and are formatted as such
+    // Parser for A record(IPv4 address)
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                    ADDRESS                    |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     void parserA()
     {
+        // must be 32-bit
         if (rdlength != 4)
         {
             return;
@@ -228,13 +170,41 @@ class DnsRR
         ss >> this->data;
     }
 
-    // domain name like format
+    // Parser for AAAA record(IPv6 address)
+    void parserAAAA()
+    {
+        uint16_t ipv6[8];
+        int i;
+
+        // Must be 128 bit
+        if (this->rdlength != 16)
+        {
+            return;
+        }
+
+        stringstream ss;
+        ss ;
+        for (i = 0; i < 16; i += 2)
+        {
+            uint16_t number = *(uint16_t*)packet + this->position + i;
+            ss << hex << number << ":";
+        }
+        
+        ss << packet[this->position + 17];  // last number without ':'
+
+        //ss << hex << (uint16_t)packet[this->position + 1] << ":";
+
+        //ss << hex << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" << ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
+    
+        ss >> this->data;
+    }
+
+    // Parser for domain name 
     // A DNS like name. This format is used for many record types
     void parserDOMAIN_NAME()
     {
-        uint32_t pos = this->position;
-        string name = this->readRRName();
-        this->position = pos;
+        uint32_t tmp = this->position;
+        string name = this->readDomainName(&tmp);
         if (name.empty())
         {
             LOGGING("Invalid domain name.")
@@ -253,14 +223,14 @@ class DnsRR
         const char * format = "mname: %s, rname: %s, serial: %d, "
                           "refresh: %d, retry: %d, expire: %d, min: %d";
 
-        mname = readRRName();
+        mname = readDomainName(&(this->position));
         if (mname.empty())
         {
             LOGGING("Invalid SOA mname");
             return;
         }
 
-        rname = readRRName();
+        rname = readDomainName(&(this->position));
         if (rname.empty())
         {
             LOGGING("Invalid SOA rname");
@@ -295,7 +265,7 @@ class DnsRR
         uint32_t spos = this->position;
 
         this->position = this->position + 2;
-        name = readRRName();
+        name = readDomainName(&(this->position));
         if (name.empty()) 
             return;
 
@@ -304,27 +274,7 @@ class DnsRR
         ss >> this->data; 
     }
 
-    // IPv6 record format.  RFC 3596
-    // A standard IPv6 address. No attempt is made to abbreviate the address.
-    void parserAAAA()
-    {
-        char *buffer;
-        uint16_t ipv6[8];
-        int i;
-
-        if (this->rdlength != 16)
-        {
-            return;
-        }
-
-        for (i=0; i < 8; i++) 
-            ipv6[i] = (packet[this->position + i * 2] << 8) + packet[this->position + i * 2 + 1];
-
-        stringstream ss;
-        ss << hex << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" << ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
     
-        ss >> this->data;
-    }
 
     // dnssec Key format. RFC 4034
     // format: flags, proto, algorithm, key
@@ -370,7 +320,7 @@ class DnsRR
 
         uint16_t o_rdlength = this->rdlength;
         this->rdlength += o_pos;
-        signer = readRRName();
+        signer = readDomainName(&(this->position));
         this->rdlength = o_rdlength;
 
         if (signer.empty())
@@ -394,7 +344,7 @@ class DnsRR
 
         uint16_t oldRdlength = this->rdlength;
         this->rdlength += this->position;
-        domain = readRRName();
+        domain = readDomainName(&(this->position));
 
         if (domain.empty())
         {
@@ -431,81 +381,84 @@ class DnsRR
         this->data = escape_data(this->packet, this->position, this->position + this->rdlength);
     }
 
+    /****************************************** PUBLIC Variables and Methods ****************************************/
 
     public:
-        string name;
-        uint16_t type;
-        uint16_t cls;
-        string rrName;
-        uint16_t ttl;
-        uint16_t rdlength;
-        uint16_t dataLen;
-        string data;
+        string domainName;  // Domain name
+        uint16_t type;      // RR type
+        string typeStr;     // RR type but string
+        string data;        // data
 
-        uint32_t position;
-        uint32_t idPos;
-        struct pcap_pkthdr* header;
-        uint8_t* packet;
-
-        DnsRR(uint32_t p, uint32_t idP, struct pcap_pkthdr* h, uint8_t* pt)
+        DnsRR(uint32_t p, uint32_t idP, struct pcap_pkthdr h, uint8_t* pt)
         {
             this->position = p;
-            this->idPos = idP;
+            this->idPosition = idP;
             this->header = h;
             this->packet = pt;
         }
 
         // Parse resource records
         // Return 0 if error occures
-        uint32_t ParseRR()
+        uint32_t Parse()
         {
-            uint32_t rr_start = this->position;
+            uint32_t initPos = this->position;     // Store initial position
 
-            this->name = this->readRRName();
+            //                                  1  1  1  1  1  1
+            //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //  |                                               |
+            //  /                                               /
+            //  /                      NAME                     /
+            //  |                                               |
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //  |                      TYPE                     |
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //  |                     CLASS                     |
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //  |                      TTL                      |
+            //  |                                               |
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+            //  |                   RDLENGTH                    |
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+            //  /                     RDATA                     /
+            //  /                                               /
+            //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+            this->domainName = this->readDomainName(&(this->position));
     
-            // Handle a bad rr name.
-            // We still want to print the rest of the escaped rr data.
-            if (this->name.empty())
+            // Unable to get domain name - error
+            if (this->domainName.empty())
             {
-                LOGGING("Bad rr name");
                 return 0;
             }
 
-            if ((header->len - this->position) < 10)
+            // Check if type, class, ttl etc. are here
+            if ((header.len - this->position) < 10)
             {
-                ERR_RET("HERE");
                 return 0;
             }
 
-            this->type = (packet[this->position] << 8) + packet[this->position + 1];
-            this->rdlength = (packet[this->position + 8] << 8) + packet[this->position + 9];
+            this->type = packet[this->position + 1];        // RR type
+            this->rdlength = packet[this->position + 9];    // data length
 
-            this->cls = (packet[this->position + 2] << 8) + packet[this->position + 3];
-            this->ttl = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                this->ttl = (this->ttl << 8) + packet[this->position + 4 + i];
-            }
+            // this->cls = (packet[this->position + 2] << 8) + packet[this->position + 3];
+            // this->ttl = 0;
+            // for (int i = 0; i < 4; i++)
+            // {
+            //     this->ttl = (this->ttl << 8) + packet[this->position + 4 + i];
+            // }
 
-            // Make sure the data for the record is actually there.
-            // If not, escape and print the raw data.
-            if (header->len < (rr_start + 10 + this->rdlength))
+            // Check if data are here
+            if (header.len < (initPos + 10 + this->rdlength))
             {
-                LOGGING("Truncated rr");
                 return 0;
             }
 
-            LOGGING("Applying RR parser for type: " << this->type);
-
+            // Set position to rdata
             this->position = this->position + 10;
             // Parse the resource record data.
 
             this->applyParser();
-    
-            // fprintf(stderr, "rr->name: %s\n", rr->name);
-            // fprintf(stderr, "type %d, cls %d, ttl %d, len %d\n", rr->type, rr->cls, rr->ttl,
-            //        rr->rdlength);
-            // fprintf(stderr, "rr->data %s\n", rr->data);
 
             return this->position + this->rdlength;
         }

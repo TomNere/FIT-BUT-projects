@@ -26,7 +26,9 @@ class DnsPacket
     
     uint8_t* packet;
     struct pcap_pkthdr header;
+    uint16_t id;                // Only for logging
     uint32_t position;
+    uint32_t idPosition;
     uint16_t ancount;
 
     /*********************************************** PRIVATE Methods ********************************************/
@@ -108,7 +110,9 @@ class DnsPacket
         }
 
         // Store ID position for future use when name is compressed
-        uint32_t idPos = this->position;
+        this->idPosition = this->position;
+
+        this->id = packet[this->position + 1];      // Save this for logging
 
         // Check if flags are valid for DNS packet
         // we don't care about ID (by design), qr is after 2 byte ID
@@ -127,7 +131,6 @@ class DnsPacket
             return;     // > 5 signalize errors
         }
 
-
         // Question count 
         uint16_t qdcount = packet[this->position + 5];
         if (qdcount != 1)
@@ -141,11 +144,11 @@ class DnsPacket
         this->position += 12;   // Set possition after header
 
         // Parse answer records
-        this->parseRRSet(idPos);
+        this->parseRRSet();
     }
 
     // Skip question and parse answers
-    void parseRRSet(uint32_t idPos)
+    void parseRRSet()
     {
         // Skip question section because we don't need it's data
         this->SkipQuestion();
@@ -154,20 +157,17 @@ class DnsPacket
         for (int i = 0; i < this->ancount; i++)
         {
             // Create and clear the data in a new dnsRR object.
-            DnsRR current(this->position, idPos, &(this->header), this->packet);
-            current.name = ""; 
-            current.data = "";
+            DnsRR answer(this->position, this->idPosition, this->header, this->packet);
+            this->position = answer.Parse();
 
-            this->position = current.ParseRR();
-
-            // If a non-recoverable error occurs when parsing an rr, 
-            // we can only return what we've got and give up.
+            // Handle error
             if (this->position == 0)
             {
-                LOGGING("Error occured when RR answer parsing");
+                LOGGING("Error occured when RR answer parsing. Skipping packet");
                 return;
             }
-            this->Answers.push_front(current);
+            LOGGING("Packet " << this->id << " has data: " << answer.data);
+            this->Answers.push_front(answer);
         }
     }
 
@@ -193,7 +193,7 @@ class DnsPacket
             ;
         }
         // Skip 2 byte long qtype and 2 byte long qclass
-        this->position += 4);
+        this->position += 4;
     }
 
     /****************************************** PUBLIC Variables and Methods ****************************************/

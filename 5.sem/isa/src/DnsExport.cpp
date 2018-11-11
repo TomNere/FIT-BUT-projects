@@ -207,7 +207,7 @@ class DnsExport
             bool added = false;
             for (it2 = recordList.begin(); it2 != recordList.end(); it2++) 
             {
-                if (it2->IsEqual(it->name, it->type, it->data))
+                if (it2->IsEqual(it->domainName, it->type, it->data))
                 {
                     it2->AddRecord();
                     added = true;
@@ -217,7 +217,7 @@ class DnsExport
 
             if (!added)
             {
-                DnsRecord dnsRR(it->name, it->type, it->rrName, it->data);
+                DnsRecord dnsRR(it->domainName, it->type, it->typeStr, it->data);
                 recordList.push_front(dnsRR);
             }
         }
