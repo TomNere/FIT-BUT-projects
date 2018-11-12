@@ -28,13 +28,12 @@ class DnsRR
     // Return domain name
     string readDomainName(uint32_t* position)
     {
-        uint32_t pos;
-        pos = *position;
-        string name = "";
+        uint32_t pos = *position;
+        string domainName = "";
         
-        while (packet[pos] != 0)
+        while (this->packet[pos] != 0)
         {
-            uint8_t ch = packet[pos];
+            uint8_t ch = this->packet[pos];
             
             if ((ch >> 6) == 0b11)          // Check for compression (first two bits enabled)
             {
@@ -51,48 +50,49 @@ class DnsRR
 
                 string label = this->readDomainName(&tmp);      // Recursion
 
-                name += label;
+                domainName += label;
                 *position = pos + 2;
-                return name;
+                return domainName;
             }
             else
             {
                 int length = ch & 0b00111111; // First two bits are offset , length is max 63
                 for (int i = 0; i < length; i++)
                 {
-                    char c = packet[++pos];
+                    char c = this->packet[++pos];
                     if (c >= '!' && c <= '~' && c != '\\')
                     {
-                        name += c;
+                        domainName += c;
                     } 
                     else
                     {
-                        name += '\\';
-                        name += 'x';
+                        domainName += '\\';
+                        domainName += 'x';
                         char c1 = c/16 + 0x30;
                         char c2 = c%16 + 0x30;
                         if (c1 > 0x39) c1 += 0x27;
                         if (c2 > 0x39) c2 += 0x27;
-                        name += c1;
-                        name += c2;
+                        domainName += c1;
+                        domainName += c2;
                     }
 
                 }
-                name += ".";
+                domainName += ".";
                 pos++;
             }
         }
 
-        if (name.size() > 0)
+        if (domainName.size() > 0)
         {
-            name = name.substr(0, name.size()-1);   // Remove last '.'
+            domainName = domainName.substr(0, domainName.size()-1);   // Remove last '.'
         }
         
         *position = pos + 1;
         
-        return name;
+        return domainName;
     }
 
+    // Set typeStr and call appropriate parser
     void applyParser()
     {
         switch (this->type)
@@ -153,12 +153,9 @@ class DnsRR
     /****************************************** RR parsers *****************************************************/
 
     // Parser for A record(IPv4 address)
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                    ADDRESS                    |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     void parserA()
     {
-        // must be 32-bit
+        // IPv4 must be 32-bit
         if (rdlength != 4)
         {
             return;
@@ -166,113 +163,126 @@ class DnsRR
 
         stringstream ss;
 
-        ss << (int)packet[this->position] << "." << (int)packet[this->position + 1] << "." << (int)packet[this->position + 2] << "." << (int)packet[this->position + 3];
-        ss >> this->data;
+        ss << (int)this->packet[this->position] << "." << (int)this->packet[this->position + 1] << "." 
+           << (int)this->packet[this->position + 2] << "." << (int)this->packet[this->position + 3];
+        this->data = ss.str();
     }
 
     // Parser for AAAA record(IPv6 address)
     void parserAAAA()
     {
-        uint16_t ipv6[8];
-        int i;
-
-        // Must be 128 bit
+        // IPv6 must be 128 bit
         if (this->rdlength != 16)
         {
             return;
         }
 
         stringstream ss;
-        ss ;
-        for (i = 0; i < 16; i += 2)
+        ss << hex;
+
+        for (int i = 0; i < 14; i += 2)
         {
-            uint16_t number = *(uint16_t*)packet + this->position + i;
-            ss << hex << number << ":";
+            ss << ntohs(*(uint16_t*)(this->packet + this->position + i)) << ":";
         }
         
-        ss << packet[this->position + 17];  // last number without ':'
-
-        //ss << hex << (uint16_t)packet[this->position + 1] << ":";
-
-        //ss << hex << ipv6[0] << ":" << ipv6[1] << ":" << ipv6[2] << ":" << ipv6[3] << ":" << ipv6[4] << ":" << ipv6[5] << ":" << ipv6[6] << ":" << ipv6[7];
-    
-        ss >> this->data;
+        ss << ntohs(*(uint16_t*)(this->packet + this->position + 14));   // last number without ':'
+        this->data = ss.str();
     }
 
-    // Parser for domain name 
-    // A DNS like name. This format is used for many record types
+    // Parser for records containing domain name (CNAME, NS...)
     void parserDOMAIN_NAME()
     {
-        uint32_t tmp = this->position;
-        string name = this->readDomainName(&tmp);
-        if (name.empty())
-        {
-            LOGGING("Invalid domain name.")
-        }
-        this->data = name;
+        uint32_t tmp = this->position;          // Use tmp to not change position in packet (we've got rdata length...)
+        this->data= this->readDomainName(&tmp);
     }
 
-    // Start of Authority format
-    // Presented as a series of labeled SOA fields.
-    void parserSOA()
-    {
-        string mname;
-        string rname;
-        string buffer;
-        uint32_t serial, refresh, retry, expire, minimum;
-        const char * format = "mname: %s, rname: %s, serial: %d, "
-                          "refresh: %d, retry: %d, expire: %d, min: %d";
-
-        mname = readDomainName(&(this->position));
-        if (mname.empty())
-        {
-            LOGGING("Invalid SOA mname");
-            return;
-        }
-
-        rname = readDomainName(&(this->position));
-        if (rname.empty())
-        {
-            LOGGING("Invalid SOA rname");
-            return;
-        }
-
-        int i;
-        serial = refresh = retry = expire = minimum = 0;
-        for (i = 0; i < 4; i++)
-        {
-            serial  <<= 8; serial  |= packet[this->position + (i + (4 * 0))];
-            refresh <<= 8; refresh |= packet[this->position + (i + (4 * 1))];
-            retry   <<= 8; retry   |= packet[this->position + (i + (4 * 2))];
-            expire  <<= 8; expire  |= packet[this->position + (i + (4 * 3))];
-            minimum <<= 8; minimum |= packet[this->position + (i + (4 * 4))];
-        }
-    
-        stringstream ss;
-        ss << mname << " " << rname << " " << serial << " " << refresh << " " << retry << " " << expire << " " << minimum; 
-
-        ss >> this->data; 
-    }
-
-    // Mail Exchange record format
-    // A standard dns name preceded by a preference number.
+    // Parser for MX record (domain name with preference)
+    // MX records cause type A additional section processing for the host specified by EXCHANGE
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                  PREFERENCE                   |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  /                   EXCHANGE                    /
+    //  /                                               /
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     void parserMX()
     {
+        // A 16 bit integer which specifies the preference given to
+        // this RR among others at the same owner.  Lower values are prefered
+        uint16_t preference = ntohs(*(uint16_t*)(this->packet + this->position));
 
-        uint16_t pref = (this->packet[this->position] << 8) + this->packet[this->position + 1];
-        string name;
-        string buffer;
-        uint32_t spos = this->position;
-
-        this->position = this->position + 2;
-        name = readDomainName(&(this->position));
-        if (name.empty()) 
-            return;
+        uint32_t tmp = this->position + 2;
+        string domainName = readDomainName(&tmp);
 
         stringstream ss;
-        ss << pref << "," << name;
-        ss >> this->data; 
+        ss << '"' << preference << " " << domainName << '"';
+        this->data = ss.str();
     }
+
+    // Parser for SOA record
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  /                     MNAME                     /
+    //  /                                               /
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  /                     RNAME                     /
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                    SERIAL                     |
+    //  |                                               |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                    REFRESH                    |
+    //  |                                               |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                     RETRY                     |
+    //  |                                               |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                    EXPIRE                     |
+    //  |                                               |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                    MINIMUM                    |
+    //  |                                               |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    void parserSOA()
+    {
+        uint32_t position = this->position;
+
+        // The <domain-name> of the name server that was the
+        // original or primary source of data for this zone.
+        string mName = readDomainName(&position);
+
+        // A <domain-name> which specifies the mailbox of the
+        // person responsible for this zone.
+        string rName = readDomainName(&position);
+
+        // The unsigned 32 bit version number of the original copy
+        // of the zone.  Zone transfers preserve this value.  This
+        // value wraps and should be compared using sequence space
+        // arithmetic.
+        uint32_t serial = ntohl(*(uint32_t*)(this->packet + position));
+
+        // A 32 bit time interval before the zone should be
+        // refreshed.
+        uint32_t refresh = ntohl(*(uint32_t*)(this->packet + position + 4));
+
+        // A 32 bit time interval that should elapse before a
+        // failed refresh should be retried.
+        uint32_t retry = ntohl(*(uint32_t*)(this->packet + position + 8));
+
+        // A 32 bit time value that specifies the upper limit on
+        // the time interval that can elapse before the zone is no
+        // longer authoritative.
+        uint32_t expire = ntohl(*(uint32_t*)(this->packet + position + 12));
+        
+        // The unsigned 32 bit minimum TTL field that should be
+        // exported with any RR from this zone.
+        uint32_t minimum = ntohl(*(uint32_t*)(this->packet + position + 16));
+
+
+        stringstream ss;
+        ss << '"' << mName << " " << rName << " " << serial << " " << refresh 
+           << " " << retry << " " << expire << " " << minimum << '"';
+        this->data = ss.str();
+    }
+
+    
 
     
 
