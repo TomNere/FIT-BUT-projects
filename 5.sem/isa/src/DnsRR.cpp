@@ -126,6 +126,10 @@ class DnsRR
                 this->typeStr  = "DNSKEY";
                 this->parserDNSKEY();
                 break;
+            case 43:
+                this->typeStr  = "DS";
+                this->parserDS();
+                break;
             case 46:
                 this->typeStr  = "RRSIG";
                 this->parseRRSIG();
@@ -133,10 +137,6 @@ class DnsRR
              case 47:
                 this->typeStr  = "NSEC";
                 this->parserNSEC();
-                break;
-            case 43:
-                this->typeStr  = "DS";
-                this->parserDS();
                 break;
             default:
                 this->typeStr  = "Unknown";
@@ -334,45 +334,87 @@ class DnsRR
         this->data = ss.str();
     }
 
-    // DNS SEC Signature. RFC 4304
-    // format: tc,alg,labels,ottl,expiration,inception,tag signer signature
-    // All fields except the signer and signature are given as decimal numbers
-    // The signer is a standard DNS name
-    // The signature is base64 encoded
+    // Parser for DS record
+    // The DS Resource Record refers to a DNSKEY RR and is used in the DNS
+    // DNSKEY authentication process. 
+    void parserDS()
+    {
+        //                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+        //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |           Key Tag             |  Algorithm    |  Digest Type  |
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  /                                                               /
+        //  /                            Digest                             /
+        //  /                                                               /
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        // The Key Tag field lists the key tag of the DNSKEY RR referred to by
+        // the DS record, in network byte order.
+        uint16_t keyTag = ntohs(*(uint16_t*)(this->packet + this->position));
+
+        // The Algorithm field lists the algorithm number of the DNSKEY RR
+        // referred to by the DS record.
+        uint8_t algorithm = packet[this->position + 2];
+
+        // The DS RR refers to a DNSKEY RR by including a digest of that DNSKEY
+        // RR.  The Digest Type field identifies the algorithm used to construct
+        // the digest.
+        uint8_t digestType = packet[this->position + 3];
+
+        string digest = base64_encode(packet + this->position + 4, this->rdLength - 4);
+
+        stringstream ss;
+        ss << '"' << keyTag << " " << algorithm << " " << digType<< " " << digest << '"';
+        this->data = ss.str();
+    }
+
+    // Parser for RRSIG record
+    // DNSSEC uses public key cryptography to sign and authenticate DNS
+    // resource record sets (RRsets).  Digital signatures are stored in
+    // RRSIG resource records and are used in the DNSSEC authentication
+    // process described in [RFC4035].
     void parseRRSIG()
     {
-        uint32_t o_pos = this->position;
-        uint16_t tc = (packet[this->position] << 8) + packet[this->position + 1];
-        uint8_t alg = packet[this->position + 2];
+        //                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+        //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |        Type Covered           |  Algorithm    |     Labels    |
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |                         Original TTL                          |
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |                      Signature Expiration                     |
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |                      Signature Inception                      |
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  |            Key Tag            |                               /
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         Signer's Name         /
+        //  /                                                               /
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        //  /                                                               /
+        //  /                            Signature                          /
+        //  /                                                               /
+        //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        // For fields description see RFC 4034
+
+        uint16_t typeCovered = ntohs(*(uint16_t*)(this->packet + this->position));
+        uint8_t algorithm = packet[this->position + 2];
         uint8_t labels = packet[this->position + 3];
-        u_int ottl, sig_exp, sig_inc;
-        uint16_t key_tag = (packet[this->position + 16] << 8) + packet[this->position + 17];
-        string signer;
-        char* signature;
+        uint32_t oTTL = ntohl(*(uint32_t*)(this->packet + this->position + 4));
+        uint32_t sigExp = ntohl(*(uint32_t*)(this->packet + this->position + 8));
+        uint32_t sigInc = ntohl(*(uint32_t*)(this->packet + this->position + 12));
+        uint16_t keyTag = ntohs(*(uint16_t*)(this->packet + this->position + 16));
 
-        this->position += 4;
-        ottl = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
-        this->position += 4;
-        sig_exp = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
-        this->position += 4; 
-        sig_inc = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
-        this->position += 6;
-
-        uint16_t o_rdlength = this->rdLength;
-        this->rdLength += o_pos;
-        signer = readDomainName(&(this->position));
-        this->rdLength = o_rdlength;
-
-        if (signer.empty())
-        {
-            return;
-        }
+        uint32_t position = this->position + 18;
+        string signerName = readDomainName(&position);
         
-        signature = b64encode(packet, this->position, o_pos + rdLength - this->position);
+        string signature = b64encode(this->packet + position, this->position + rdLength - position);
     
         stringstream ss;
-        ss << tc << "," << alg << "," << labels << "," << ottl << "," << sig_exp << "," << sig_inc << "," << key_tag << "," << signer << "," << signature;
-        ss >> this->data;
+        ss << '"' << typeCovered << " " << algorithm << " " << labels << " " << oTTL << " " << sigExp 
+           << " " << sigInc << " " << keyTag << " " << signerName << " " << signature << '"';
+        this->data = ss.str();
     }
 
     // NSEC format.  RFC 4034
@@ -397,21 +439,7 @@ class DnsRR
         ss >> this->data;
     }
 
-    //DS DNS SEC record.  RFC 4034
-    //format: key_tag,algorithm,digest_type,digest
-    //The keytag, algorithm, and digest type are given as base 10
-    //The digest is base64 encoded
-    void parserDS()
-    {
-        uint16_t key_tag = (packet[this->position] << 8) + packet[this->position + 1];
-        uint8_t alg = packet[this->position + 2];
-        uint8_t dig_type = packet[this->position + 3];
-        char* digest = b64encode(packet ,this->position + 4, this->rdLength - 4);
-
-        stringstream ss;
-        ss << key_tag << "," << alg<< "," << dig_type<< "," << digest;
-        ss >> this->data;
-    }
+    
 
     
     
