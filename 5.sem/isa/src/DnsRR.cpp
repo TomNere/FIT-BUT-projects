@@ -1,4 +1,3 @@
-
 #include <stdint.h> // Getopt
 #include <pcap.h>   // No comment needed...
 #include <string>
@@ -16,7 +15,7 @@ class DnsRR
 
     uint16_t cls;
     uint16_t ttl;
-    uint16_t rdlength;
+    uint16_t rdLength;
 
     uint32_t position;
     uint32_t idPosition;
@@ -59,23 +58,15 @@ class DnsRR
                 int length = ch & 0b00111111; // First two bits are offset , length is max 63
                 for (int i = 0; i < length; i++)
                 {
-                    char c = this->packet[++pos];
-                    if (c >= '!' && c <= '~' && c != '\\')
+                    uint8_t ch = this->packet[++pos];
+                    if (isprint(ch))
                     {
-                        domainName += c;
-                    } 
+                        domainName += ch;
+                    }
                     else
                     {
-                        domainName += '\\';
-                        domainName += 'x';
-                        char c1 = c/16 + 0x30;
-                        char c2 = c%16 + 0x30;
-                        if (c1 > 0x39) c1 += 0x27;
-                        if (c2 > 0x39) c2 += 0x27;
-                        domainName += c1;
-                        domainName += c2;
+                        domainName += escapeChar(ch);
                     }
-
                 }
                 domainName += ".";
                 pos++;
@@ -126,9 +117,11 @@ class DnsRR
                 this->parserTXT();
                 break;
             case 99:
+                // RFC says this answer never arrive but....
                 this->typeStr  = "SPF";
-                // TODO
-            // DNSSEC
+                this->parserTXT();
+                break;
+            /***************************** DNSSEC *****************************/
             case 48:
                 this->typeStr  = "DNSKEY";
                 this->parserDNSKEY();
@@ -156,7 +149,7 @@ class DnsRR
     void parserA()
     {
         // IPv4 must be 32-bit
-        if (rdlength != 4)
+        if (rdLength != 4)
         {
             return;
         }
@@ -172,7 +165,7 @@ class DnsRR
     void parserAAAA()
     {
         // IPv6 must be 128 bit
-        if (this->rdlength != 16)
+        if (this->rdLength != 16)
         {
             return;
         }
@@ -198,14 +191,16 @@ class DnsRR
 
     // Parser for MX record (domain name with preference)
     // MX records cause type A additional section processing for the host specified by EXCHANGE
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                  PREFERENCE                   |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  /                   EXCHANGE                    /
-    //  /                                               /
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    
     void parserMX()
     {
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                  PREFERENCE                   |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  /                   EXCHANGE                    /
+        //  /                                               /
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
         // A 16 bit integer which specifies the preference given to
         // this RR among others at the same owner.  Lower values are prefered
         uint16_t preference = ntohs(*(uint16_t*)(this->packet + this->position));
@@ -219,29 +214,31 @@ class DnsRR
     }
 
     // Parser for SOA record
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  /                     MNAME                     /
-    //  /                                               /
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  /                     RNAME                     /
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                    SERIAL                     |
-    //  |                                               |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                    REFRESH                    |
-    //  |                                               |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                     RETRY                     |
-    //  |                                               |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                    EXPIRE                     |
-    //  |                                               |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    //  |                    MINIMUM                    |
-    //  |                                               |
-    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    
     void parserSOA()
     {
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  /                     MNAME                     /
+        //  /                                               /
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  /                     RNAME                     /
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                    SERIAL                     |
+        //  |                                               |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                    REFRESH                    |
+        //  |                                               |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                     RETRY                     |
+        //  |                                               |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                    EXPIRE                     |
+        //  |                                               |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        //  |                    MINIMUM                    |
+        //  |                                               |
+        //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
         uint32_t position = this->position;
 
         // The <domain-name> of the name server that was the
@@ -275,33 +272,66 @@ class DnsRR
         // exported with any RR from this zone.
         uint32_t minimum = ntohl(*(uint32_t*)(this->packet + position + 16));
 
-
         stringstream ss;
         ss << '"' << mName << " " << rName << " " << serial << " " << refresh 
            << " " << retry << " " << expire << " " << minimum << '"';
         this->data = ss.str();
     }
 
-    
+    // Parser for TXT/SPF record (One or more <character-string>s.)
+    // TXT could contain SPF but we don't care
+    void parserTXT()
+    {
+        for (int i = 0; i < this->rdLength; i++)
+        {
+            uint8_t ch = this->packet[this->position + i];
+            if (isprint(ch))
+            {
+                this->data += ch;
+            }
+            else
+            {
+                this->data += escapeChar(ch);
+            }
+        }
+    }
 
-    
+    /********************************************** DNSSEC *****************************************/
 
-    // dnssec Key format. RFC 4034
-    // format: flags, proto, algorithm, key
-    // All fields except the key are printed as decimal numbers.
-    // The key is given in base64.
+    // Parser for DNSKEY
+    // DNSSEC uses public key cryptography to sign and authenticate DNS
+    // resource record sets (RRsets).
     void parserDNSKEY()
     {
-        uint16_t flags = (packet[this->position] << 8) + packet[this->position + 1];
-        uint8_t proto = packet[this->position + 2];
-        uint8_t algorithm = packet[this->position + 3];
-        char* key;
+        //                      1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |              Flags            |    Protocol   |   Algorithm   |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // /                                                               /
+        // /                            Public Key                         /
+        // /                                                               /
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-        key = b64encode(packet, this->position + 4, this->rdlength - 4);
+        // flags (zone key etc.)
+        uint16_t flags = ntohs(*(uint16_t*)(this->packet + this->position));
+
+        // protocol must be 3, else invalid 
+        uint8_t protocol = packet[this->position + 2];
+        if (protocol != 3)
+        {
+            return;
+        }
+
+        // identifies the public key's cryptographic
+        // algorithm and determines the format of the Public Key field
+        uint8_t algorithm = packet[this->position + 3];
+
+        string publicKey = base64_encode(packet + this->position + 4, this->rdLength - 4);
 
         stringstream ss;
-        ss << flags << "," << proto << "," << algorithm << "," << key;
-        ss >> this->data;
+        ss << '"' << flags << " " << protocol << " " << algorithm << " " << publicKey << '"';
+        this->data = ss.str();
     }
 
     // DNS SEC Signature. RFC 4304
@@ -328,17 +358,17 @@ class DnsRR
         sig_inc = (packet[this->position] << 24) + (packet[this->position + 1] << 16) + (packet[this->position + 2] << 8) + packet[this->position + 3];
         this->position += 6;
 
-        uint16_t o_rdlength = this->rdlength;
-        this->rdlength += o_pos;
+        uint16_t o_rdlength = this->rdLength;
+        this->rdLength += o_pos;
         signer = readDomainName(&(this->position));
-        this->rdlength = o_rdlength;
+        this->rdLength = o_rdlength;
 
         if (signer.empty())
         {
             return;
         }
         
-        signature = b64encode(packet, this->position, o_pos + rdlength - this->position);
+        signature = b64encode(packet, this->position, o_pos + rdLength - this->position);
     
         stringstream ss;
         ss << tc << "," << alg << "," << labels << "," << ottl << "," << sig_exp << "," << sig_inc << "," << key_tag << "," << signer << "," << signature;
@@ -352,8 +382,8 @@ class DnsRR
     {
         string buffer, domain, bitmap;
 
-        uint16_t oldRdlength = this->rdlength;
-        this->rdlength += this->position;
+        uint16_t oldRdlength = this->rdLength;
+        this->rdLength += this->position;
         domain = readDomainName(&(this->position));
 
         if (domain.empty())
@@ -376,7 +406,7 @@ class DnsRR
         uint16_t key_tag = (packet[this->position] << 8) + packet[this->position + 1];
         uint8_t alg = packet[this->position + 2];
         uint8_t dig_type = packet[this->position + 3];
-        char* digest = b64encode(packet ,this->position + 4, this->rdlength - 4);
+        char* digest = b64encode(packet ,this->position + 4, this->rdLength - 4);
 
         stringstream ss;
         ss << key_tag << "," << alg<< "," << dig_type<< "," << digest;
@@ -384,12 +414,7 @@ class DnsRR
     }
 
     
-    // This data is simply hex escaped
-    // Non printable characters are given as a hex value (\\x30), for example
-    void parserTXT()
-    {
-        this->data = escape_data(this->packet, this->position, this->position + this->rdlength);
-    }
+    
 
     /****************************************** PUBLIC Variables and Methods ****************************************/
 
@@ -449,7 +474,7 @@ class DnsRR
             }
 
             this->type = packet[this->position + 1];        // RR type
-            this->rdlength = packet[this->position + 9];    // data length
+            this->rdLength = packet[this->position + 9];    // data length
 
             // this->cls = (packet[this->position + 2] << 8) + packet[this->position + 3];
             // this->ttl = 0;
@@ -459,7 +484,7 @@ class DnsRR
             // }
 
             // Check if data are here
-            if (header.len < (initPos + 10 + this->rdlength))
+            if (header.len < (initPos + 10 + this->rdLength))
             {
                 return 0;
             }
@@ -470,6 +495,6 @@ class DnsRR
 
             this->applyParser();
 
-            return this->position + this->rdlength;
+            return this->position + this->rdLength;
         }
 };
