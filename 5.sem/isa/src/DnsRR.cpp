@@ -2,8 +2,7 @@
 #include <pcap.h>   // No comment needed...
 #include <string>
 #include <sstream>      // std::stringstream
-#include "structures.h"
-#include "helpers.cpp"
+#include "Helpers.cpp"
 
 using namespace std;
 
@@ -13,14 +12,11 @@ class DnsRR
 {
     /*********************************************** PRIVATE Variables ********************************************/
 
-    uint16_t cls;
-    uint16_t ttl;
-    uint16_t rdLength;
-
     uint32_t position;
     uint32_t idPosition;
     struct pcap_pkthdr header;
     uint8_t* packet;
+    uint16_t rdLength;
 
     /*********************************************** PRIVATE Methods ********************************************/
 
@@ -65,7 +61,7 @@ class DnsRR
                     }
                     else
                     {
-                        domainName += escapeChar(ch);
+                        domainName += Helpers::ToHex(ch);
                     }
                 }
                 domainName += ".";
@@ -139,7 +135,9 @@ class DnsRR
                 this->parserNSEC();
                 break;
             default:
-                this->typeStr  = "Unknown";
+                stringstream ss;
+                ss <<  "Unsupported - " << this->type;
+                this->typeStr = ss.str();
         }
     }
 
@@ -291,7 +289,7 @@ class DnsRR
             }
             else
             {
-                this->data += escapeChar(ch);
+                this->data += Helpers::ToHex(ch);
             }
         }
     }
@@ -327,7 +325,7 @@ class DnsRR
         // algorithm and determines the format of the Public Key field
         uint8_t algorithm = packet[this->position + 3];
 
-        string publicKey = base64_encode(packet + this->position + 4, this->rdLength - 4);
+        string publicKey = Helpers::Base64Encode(packet + this->position + 4, this->rdLength - 4);
 
         stringstream ss;
         ss << '"' << flags << " " << protocol << " " << algorithm << " " << publicKey << '"';
@@ -362,10 +360,10 @@ class DnsRR
         // the digest.
         uint8_t digestType = packet[this->position + 3];
 
-        string digest = base64_encode(packet + this->position + 4, this->rdLength - 4);
+        string digest = Helpers::Base64Encode(packet + this->position + 4, this->rdLength - 4);
 
         stringstream ss;
-        ss << '"' << keyTag << " " << algorithm << " " << digType<< " " << digest << '"';
+        ss << '"' << keyTag << " " << algorithm << " " << digestType<< " " << digest << '"';
         this->data = ss.str();
     }
 
@@ -409,7 +407,7 @@ class DnsRR
         uint32_t position = this->position + 18;
         string signerName = readDomainName(&position);
         
-        string signature = b64encode(this->packet + position, this->position + rdLength - position);
+        string signature = Helpers::Base64Encode(this->packet + position, this->position + rdLength - position);
     
         stringstream ss;
         ss << '"' << typeCovered << " " << algorithm << " " << labels << " " << oTTL << " " << sigExp 
@@ -417,32 +415,40 @@ class DnsRR
         this->data = ss.str();
     }
 
-    // NSEC format.  RFC 4034
-    // Format: domain bitmap
-    // domain is a DNS name, bitmap is hex escaped
+    // Parser for NSEC record
+    // The NSEC resource record lists two separate things: the next owner
+    // name (in the canonical ordering of the zone) that contains
+    // authoritative data or a delegation point NS RRset, and the set of RR
+    // types present at the NSEC RR's owner name
     void parserNSEC()
     {
-        string buffer, domain, bitmap;
+        //                      1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // /                      Next Domain Name                         /
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // /                       Type Bit Maps                           /
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-        uint16_t oldRdlength = this->rdLength;
-        this->rdLength += this->position;
-        domain = readDomainName(&(this->position));
+        uint32_t position = this->position;
+        string domain = readDomainName(&position);
 
-        if (domain.empty())
+        // The Type Bit Maps field identifies the RRset types that exist at the
+        // NSEC RR's owner name.
+        // We will symbolize as hex numbers
+
+        string bitmap;
+        for (int i = position; i < this->rdLength - (position - this->position); i++)
         {
-            return;
-        } 
-    
-        bitmap = escape_data(packet, this->position, this->position + oldRdlength);
+            uint8_t ch = this->packet[i];
+            bitmap += Helpers::ToHex(ch);
+            bitmap += " ";
+        }
+
         stringstream ss;
-        ss << domain << "," << bitmap;
-        ss >> this->data;
+        ss << '"' << domain << " " << bitmap << '"';
+        this->data = ss.str();
     }
-
-    
-
-    
-    
 
     /****************************************** PUBLIC Variables and Methods ****************************************/
 
@@ -452,6 +458,7 @@ class DnsRR
         string typeStr;     // RR type but string
         string data;        // data
 
+        // Initialize packet data in constructor
         DnsRR(uint32_t p, uint32_t idP, struct pcap_pkthdr h, uint8_t* pt)
         {
             this->position = p;
@@ -504,13 +511,6 @@ class DnsRR
             this->type = packet[this->position + 1];        // RR type
             this->rdLength = packet[this->position + 9];    // data length
 
-            // this->cls = (packet[this->position + 2] << 8) + packet[this->position + 3];
-            // this->ttl = 0;
-            // for (int i = 0; i < 4; i++)
-            // {
-            //     this->ttl = (this->ttl << 8) + packet[this->position + 4 + i];
-            // }
-
             // Check if data are here
             if (header.len < (initPos + 10 + this->rdLength))
             {
@@ -519,8 +519,8 @@ class DnsRR
 
             // Set position to rdata
             this->position = this->position + 10;
-            // Parse the resource record data.
 
+            // Parse the resource record data.
             this->applyParser();
 
             return this->position + this->rdLength;

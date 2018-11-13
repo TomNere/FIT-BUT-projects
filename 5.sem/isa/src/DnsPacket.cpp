@@ -1,4 +1,3 @@
-#include "structures.h"
 #include "DnsRR.cpp"
 
 #include <netinet/in.h>
@@ -167,7 +166,7 @@ class DnsPacket
                 return;
             }
             LOGGING("Packet " << this->id << " has data: " << answer.data);
-            this->Answers.push_front(answer);
+            this->Answers.push_back(answer);
         }
     }
 

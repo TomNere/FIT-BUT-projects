@@ -15,19 +15,26 @@
 
 #include <err.h>
 
-#include "structures.h"
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
 
 using namespace std;
 
-/*************************************************** STATICS ******************************************************/
+/*************************************************** GLOBALS ******************************************************/
 
 // List collecting all stats to print/send
 list<DnsRecord> recordList;
 
 // pcap_t structure better here for easy signal handling such as recordList
 pcap_t* myPcap;
+
+/*************************************************** CONSTS ******************************************************/
+
+const string help = "Invalid parameters!\n\n"
+                    "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n";
+
+#define SYSLOG_PORT 514
+#define MESSAGE_SIZE 900
 
 // Main class
 // Parse arguments and run sniffer
@@ -218,7 +225,7 @@ class DnsExport
             if (!added)
             {
                 DnsRecord dnsRR(it->domainName, it->type, it->typeStr, it->data);
-                recordList.push_front(dnsRR);
+                recordList.push_back(dnsRR);
             }
         }
     }
@@ -292,7 +299,7 @@ class DnsExport
             if ((record + message).size() > MESSAGE_SIZE)
             {
                 message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
-                messages.push_front(message);       // front or back? Doesn't matter...
+                messages.push_back(message);
                 message = "";
             }
             message += record;
@@ -300,7 +307,7 @@ class DnsExport
 
         // At the end add last message to the list
         message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
-        messages.push_front(message);
+        messages.push_back(message);
 
         return messages;
     }
