@@ -1,19 +1,12 @@
-#include <unistd.h> // Getopt
-#include <list>
-#include <iostream> // No comment needed...
-#include <iostream> // No comment needed...
-#include <unistd.h> // Getopt
-#include <signal.h> // Signal shandling
-#include <pcap.h>   // No comment needed...
-#include <arpa/inet.h>
-#include <string.h>
-#include <pthread.h>
-#include <iterator>
-#include <sys/socket.h> // Sockets
+#include <unistd.h>     // Getopt
+#include <list>         // List, iterator
+#include <iostream>     // No comment needed...
+#include <unistd.h>     // Getopt
+#include <signal.h>     // Signal shandling
+#include <pcap.h>       // No comment needed...
+#include <string.h>     // bzero, bcopy
+#include <pthread.h>    // Sending loop
 #include <netdb.h>      // gethostbyname...
-#include <ctime>
-
-#include <err.h>
 
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
@@ -31,7 +24,11 @@ pcap_t* myPcap;
 /*************************************************** CONSTS ******************************************************/
 
 const string help = "Invalid parameters!\n\n"
-                    "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n";
+                    "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n"
+                    "file.pcap - file to sniff\n"
+                    "interface - interface to sniff (or ANY for all interfaces)\n"
+                    "syslog-server - syslog server where the stats are sent\n"
+                    "seconds - time period of interface sniffing\n";
 
 #define SYSLOG_PORT 514
 #define MESSAGE_SIZE 900
@@ -51,6 +48,7 @@ class DnsExport
     // For debugging
     uint32_t packetCount = 0;
 
+    // For pcap if error occures
     char errBuf[PCAP_ERRBUF_SIZE];
 
     /*********************************************** PRIVATE Methods ********************************************/
@@ -58,7 +56,6 @@ class DnsExport
     // Parse arguments
     void parseArg(int argc, char const *argv[])
     {
-        this->file = this->interface = this->syslogServer = this->time = "";
         int option;
 
         while ((option = getopt(argc, (char **)argv, "r:i:s:t:")) != -1)
@@ -70,7 +67,6 @@ class DnsExport
                     {
                         ERR_RET(help);
                     }
-
                     this->file = string(optarg);
                     break;
                 case 'i':
@@ -78,7 +74,6 @@ class DnsExport
                     {
                         ERR_RET(help);
                     }
-
                     this->interface = string(optarg);
                     break;
                 case 's':
@@ -86,7 +81,6 @@ class DnsExport
                     {
                         ERR_RET(help);
                     }
-
                     this->syslogServer = string(optarg);
                     break;
                 case 't':
@@ -94,7 +88,6 @@ class DnsExport
                     {
                         ERR_RET(help);
                     }
-
                     this->time = string(optarg);
                     break;
                 default:
@@ -212,6 +205,8 @@ class DnsExport
             list<DnsRecord>::iterator it2; 
 
             bool added = false;
+
+            // Try to find record in list
             for (it2 = recordList.begin(); it2 != recordList.end(); it2++) 
             {
                 if (it2->IsEqual(it->domainName, it->type, it->data))
@@ -222,6 +217,7 @@ class DnsExport
                 }
             }
 
+            // Create new record
             if (!added)
             {
                 DnsRecord dnsRR(it->domainName, it->type, it->typeStr, it->data);
@@ -230,12 +226,12 @@ class DnsExport
         }
     }
 
-    // Send stats to syslog server (TCP)
+    // Send stats to syslog server (over UDP)
     void sendStats()
     {
         // Create socket
         int sock;
-        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
+        if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) <= 0)
         {
             ERR_RET("Syslog - socket creating error!");
         }
@@ -254,11 +250,7 @@ class DnsExport
         bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
         serverAddress.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
 
-        // Connect to syslog
-        if ((connect(sock, (const struct sockaddr*)&serverAddress, sizeof(serverAddress))) != 0)
-        {
-            ERR_RET("Syslog - TCP connection error!");
-        }
+        socklen_t serverlen = sizeof(serverAddress);
 
         // Get and send all mesagges
         list<string>messages = getMessages();
@@ -266,13 +258,13 @@ class DnsExport
 
         for (it = messages.begin(); it != messages.end(); it++)
         {
-            int bytestx = send(sock, it->c_str(), it->length() + 1, 0);      // + 1 for '\0' character 
-            if (bytestx < 0)
+            // Send packet
+            if (sendto(sock, it->c_str(), BUFSIZ, 0, (struct sockaddr*)&serverAddress, serverlen) < 0)
             {
-                ERR_RET("Syslog - sending error!");
+                ERR_RET("Syslog - sendto error!");
             }
         }
-    
+
         close(sock);           // Close socket
     }
 
@@ -325,20 +317,8 @@ class DnsExport
 
         char currentTime[84] = "";
         sprintf(currentTime, "%s.%03dZ", buffer, milli);
+
         return currentTime;
-
-        // time_t rawtime;
-        // struct tm* timeinfo;
-
-        // time(&rawtime);
-        // timeinfo = localtime(&rawtime);
-        // int milli = timeinfo->tv_usec / 1000;
-
-        // // Must be static, otherwise won't work
-        // static char _retval[20];
-        // strftime(_retval, sizeof(_retval), "%Y-%m-%dT%H:%M:%S", timeinfo);
-
-        // return _retval;
     }
 
 
@@ -358,6 +338,7 @@ class DnsExport
             signal(SIGUSR1, handleSig);
 
             // Choose what to do
+            
             if (this->interface.compare(""))
             {
                 //pthread_t t;
