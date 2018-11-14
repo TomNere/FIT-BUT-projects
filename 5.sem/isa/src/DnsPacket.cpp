@@ -1,15 +1,10 @@
 #include "DnsRR.cpp"
 
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/ip6.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-#include <netinet/if_ether.h>
-#include <pcap.h>
-
-#include <arpa/inet.h>
-#include <netinet/ether.h> 
+#include <netinet/ip.h>         // ip struct
+#include <netinet/ip6.h>        // ip6_hdr struct
+#include <netinet/udp.h>        // udphrd
+#include <netinet/tcp.h>        // tcphdr
+#include <netinet/if_ether.h>   // ETHERTYPE_IP...
 
 using namespace std;
 
@@ -28,7 +23,7 @@ class DnsPacket
     uint16_t id;                // Only for logging
     uint32_t position;
     uint32_t idPosition;
-    uint16_t ancount;
+    uint16_t answerCount;
 
     /*********************************************** PRIVATE Methods ********************************************/
 
@@ -42,7 +37,7 @@ class DnsPacket
         uint8_t transProtType;
 
         // Read the ethernet header
-        eptr = (struct ether_header*) packet;
+        eptr = (struct ether_header*)packet;
         this->position += sizeof(struct ether_header);
 
         // Check ethernet type 
@@ -101,17 +96,17 @@ class DnsPacket
         // |                    ARCOUNT                    |
         // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
-        // Check if DNS header is 12 bytes long
+        // Check if DNS header is at least 12 bytes long
         // 2 byte ID, 2 bytes of flags, and 4 x 2 bytes of counts.
         if (this->header.len - this->position < 12)
         {
             return;     // Skip this packet...
         }
 
-        // Store ID position for future use when name is compressed
+        // Store ID position for future use when domain name is compressed
         this->idPosition = this->position;
 
-        this->id = packet[this->position + 1];      // Save this for logging
+        this->id = ntohs(*(uint16_t*)(this->packet + this->position));      // Save this for logging
 
         // Check if flags are valid for DNS packet
         // we don't care about ID (by design), qr is after 2 byte ID
@@ -131,14 +126,14 @@ class DnsPacket
         }
 
         // Question count 
-        uint16_t qdcount = packet[this->position + 5];
+        uint16_t qdcount = ntohs(*(uint16_t*)(this->packet + this->position + 4));
         if (qdcount != 1)
         {
             return;     // question count other than 1 in DNS packet is very weird
         }
 
         // Answer count, other counts are useless for us
-        this->ancount = packet[this->position + 7];
+        this->answerCount = ntohs(*(uint16_t*)(this->packet + this->position + 6));
 
         this->position += 12;   // Set possition after header
 
@@ -153,9 +148,9 @@ class DnsPacket
         this->SkipQuestion();
 
         // Parse answers
-        for (int i = 0; i < this->ancount; i++)
+        for (int i = 0; i < this->answerCount; i++)
         {
-            // Create and clear the data in a new dnsRR object.
+            // Create a new DnsRR object.
             DnsRR answer(this->position, this->idPosition, this->header, this->packet);
             this->position = answer.Parse();
 
@@ -166,7 +161,12 @@ class DnsPacket
                 return;
             }
             LOGGING("Packet " << this->id << " has data: " << answer.data);
-            this->Answers.push_back(answer);
+
+            // Add to list if data exists
+            if (answer.data != "")
+            {
+                this->Answers.push_back(answer);
+            }
         }
     }
 
@@ -191,6 +191,7 @@ class DnsPacket
         {
             ;
         }
+
         // Skip 2 byte long qtype and 2 byte long qclass
         this->position += 4;
     }

@@ -1,5 +1,5 @@
-#include <string>
-#include <iomanip>
+#include <string>       // Strings
+#include <iomanip>      // setfill...
 
 using namespace std;
 

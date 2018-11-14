@@ -1,30 +1,38 @@
-#include <string>
-#include <unistd.h> // Getopt
-#include <sstream>
+#include <string>   // Strings
+#include <sstream>  // stringstream
 
 using namespace std;
 
+// Class holding one statistic info
+// Domain name, rr type and rr data
 class DnsRecord
 {
-	string domain;
-	uint32_t rrType;
-    string rrName;
-	string rrAnswer;
-	uint count;
+    /********************************************** Private variables *****************************************/
+
+	string domainName;
+	uint16_t rrType;
+    string rrName;      // rrType string
+	string rrData;
+	uint16_t count;
+
+    /************************************************ PUBLIC Methods ******************************************/
 
     public:
+
+        // Initialize new record
         DnsRecord(string d, uint32_t rrt, string rrn, string rra)
         {
-            this->domain = d;
+            this->domainName = d;
             this->rrType = rrt;
             this->rrName = rrn;
-            this->rrAnswer = rra;
+            this->rrData = rra;
             this->count = 1;
         }
 
-        bool IsEqual(string d, uint32_t rrt, string rra)
+        // Test if this record is equal to given parameters
+        bool IsEqual(string d, uint16_t rrt, string rra)
         {
-            if (d.compare(this->domain) || rrt != this->rrType || rra.compare(this->rrAnswer))
+            if (d.compare(this->domainName) || rrt != this->rrType || rra.compare(this->rrData))
             {
                 return false;
             }
@@ -32,16 +40,18 @@ class DnsRecord
             return true;
         }
 
+        // Simply increment counter
         void AddRecord()
         {
             count++;
         }
 
+        // Return record in one string
         string GetString()
         {
             string str;
             stringstream ss;
-            ss << this->domain << " " << this->rrName << " " << this->rrAnswer << " " << count << endl;
+            ss << this->domainName << " " << this->rrName << " " << this->rrData << " " << count << endl;
             return ss.str();
         }
 };

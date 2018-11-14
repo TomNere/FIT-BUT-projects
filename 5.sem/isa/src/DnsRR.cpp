@@ -23,12 +23,11 @@ class DnsRR
     // Return domain name
     string readDomainName(uint32_t* position)
     {
-        uint32_t pos = *position;
         string domainName = "";
         
-        while (this->packet[pos] != 0)
+        while (this->packet[*position] != 0)
         {
-            uint8_t ch = this->packet[pos];
+            uint8_t ch = this->packet[*position];
             
             if ((ch >> 6) == 0b11)          // Check for compression (first two bits enabled)
             {
@@ -40,13 +39,13 @@ class DnsRR
                 //| 1  1|                OFFSET                   |
                 //+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--
 
-                offset = ((ch & 0b00111111) << 8) | packet[pos + 1]; // First two bits are offset , length is max 63
+                offset = ((ch & 0b00111111) << 8) | packet[(*position) + 1]; // First two bits are offset , length is max 63
                 uint32_t tmp = this->idPosition + offset;
 
                 string label = this->readDomainName(&tmp);      // Recursion
 
                 domainName += label;
-                *position = pos + 2;
+                *position += 2;
                 return domainName;
             }
             else
@@ -54,7 +53,7 @@ class DnsRR
                 int length = ch & 0b00111111; // First two bits are offset , length is max 63
                 for (int i = 0; i < length; i++)
                 {
-                    uint8_t ch = this->packet[++pos];
+                    uint8_t ch = this->packet[++(*position)];
                     if (isprint(ch))
                     {
                         domainName += ch;
@@ -65,7 +64,7 @@ class DnsRR
                     }
                 }
                 domainName += ".";
-                pos++;
+                (*position)++;
             }
         }
 
@@ -74,7 +73,7 @@ class DnsRR
             domainName = domainName.substr(0, domainName.size()-1);   // Remove last '.'
         }
         
-        *position = pos + 1;
+        (*position)++;
         
         return domainName;
     }
