@@ -38,6 +38,10 @@
         "tuple": "cpp",
         "typeinfo": "cpp",
         "utility": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "thread": "cpp",
+        "chrono": "cpp",
+        "memory": "cpp",
+        "ratio": "cpp"
     }
 }

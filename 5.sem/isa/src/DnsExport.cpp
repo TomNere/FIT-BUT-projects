@@ -5,8 +5,8 @@
 #include <signal.h>     // Signal shandling
 #include <pcap.h>       // No comment needed...
 #include <string.h>     // bzero, bcopy
-#include <pthread.h>    // Sending loop
 #include <netdb.h>      // gethostbyname...
+#include <thread>       // Sending loop
 
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
@@ -15,11 +15,24 @@ using namespace std;
 
 /*************************************************** GLOBALS ******************************************************/
 
+// To identify linux ssl datalink
+uint8_t datalink;
+
 // List collecting all stats to print/send
 list<DnsRecord> recordList;
 
 // pcap_t structure better here for easy signal handling such as recordList
 pcap_t* myPcap;
+
+// Struct holding comand line parameters
+typedef struct
+{
+    string file;
+    string interface;
+    string time;
+    string syslogServer;
+} rawParameters;
+rawParameters parameters;
 
 /*************************************************** CONSTS ******************************************************/
 
@@ -39,12 +52,6 @@ class DnsExport
 {
     /*********************************************** PRIVATE Variables ********************************************/
     
-    // Parameters
-    string file;
-    string interface;
-    string syslogServer;
-    string time;
-
     // For debugging
     uint32_t packetCount = 0;
 
@@ -63,32 +70,32 @@ class DnsExport
             switch (option)
             {
                 case 'r':
-                    if (this->file.compare(""))
+                    if (parameters.file.compare(""))
                     {
                         ERR_RET(help);
                     }
-                    this->file = string(optarg);
+                   parameters.file = string(optarg);
                     break;
                 case 'i':
-                    if (this->interface.compare(""))
+                    if (parameters.interface.compare(""))
                     {
                         ERR_RET(help);
                     }
-                    this->interface = string(optarg);
+                    parameters.interface = string(optarg);
                     break;
                 case 's':
-                    if (this->syslogServer.compare(""))
+                    if (parameters.syslogServer.compare(""))
                     {
                         ERR_RET(help);
                     }
-                    this->syslogServer = string(optarg);
+                    parameters.syslogServer = string(optarg);
                     break;
                 case 't':
-                    if (this->time.compare(""))
+                    if (parameters.time.compare(""))
                     {
                         ERR_RET(help);
                     }
-                    this->time = string(optarg);
+                    parameters.time = string(optarg);
                     break;
                 default:
                     ERR_RET(help);
@@ -99,7 +106,15 @@ class DnsExport
     // Signal handler for SIGUSR1 writing stats to stdout
     static void handleSig(int sigNum)
     {
-        writeStats();
+        if (sigNum == SIGUSR1)
+        {
+            writeStats();
+        }
+        else if (sigNum == SIGINT)
+        {
+            pcap_close(myPcap);
+            exit(0);
+        }
     }
 
     // Write stats to stdout
@@ -113,35 +128,40 @@ class DnsExport
         }
     }
 
-    // Stats sender
-    void statsSender()
+    // Interface sniffer
+    void sniffInterface()
     {
+        // Open device for sniffing 100 ms is value used by wireshark
+        if ((myPcap = pcap_open_live(parameters.interface.c_str(), BUFSIZ, true, 100, this->errBuf)) == NULL)
+        {
+            ERR_RET("Unable to open interface for listening. Error: " << errBuf);
+        }
+
+        datalink = pcap_datalink(myPcap);
+
         int time;
-        if (!(this->time.compare("")))
+        if (!(parameters.time.compare("")))
         {
             time = 60; // Default value
         }
         else
         {
             // Check for valid time
-            if (this->time.find_first_not_of("0123456789") == string::npos)
+            if (parameters.time.find_first_not_of("0123456789") == string::npos)
             {
-                time = stoi(this->time, NULL, 10);
+                time = stoi(parameters.time, NULL, 10);
             }
             else
             {
                 ERR_RET("Time must be number in seconds!");
             }
         }
-    }
 
-    // Interface sniffer
-    void sniffInterface()
-    {
-        // Open device for sniffing
-        if ((myPcap = pcap_open_live(this->interface.c_str(), BUFSIZ, true, 0, this->errBuf)) == NULL)
+        if (parameters.syslogServer.compare(""))
         {
-            ERR_RET("Unable to open interface for listening. Error: " << errBuf);
+            // Start sending loop
+            pthread_t thread;
+            pthread_create(&thread, NULL, sendingLoop, (void*)&time);
         }
 
         // Start sniffing forever...
@@ -156,10 +176,12 @@ class DnsExport
     void sniffFile()
     {
         // Open file for sniffing
-        if ((myPcap = pcap_open_offline(this->file.c_str(), this->errBuf)) == NULL)
+        if ((myPcap = pcap_open_offline(parameters.file.c_str(), this->errBuf)) == NULL)
         {
             ERR_RET("Unable to open pcap file. Error:" << errBuf);
         }
+
+        datalink = pcap_datalink(myPcap);
 
         // Sniff file
         if (pcap_loop(myPcap, -1, this->pcapHandler, NULL) < 0)
@@ -171,7 +193,7 @@ class DnsExport
         pcap_close(myPcap);
 
         // Send stats if syslog server defined, write to stdout otherwise
-        if (!this->syslogServer.compare(""))
+        if (!parameters.syslogServer.compare(""))
         {
             this->writeStats();
         }
@@ -185,8 +207,10 @@ class DnsExport
     // Parse packet and add stats if valid and supported DNS packet
     static void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* header, const uint8_t* packet)
     {
+        LOGGING("pcapHandler");
+
         // Create object and try to parse
-        DnsPacket dnsPacket(packet, header);
+        DnsPacket dnsPacket(packet, header, datalink);
         dnsPacket.Parse();
 
         // Add answers to record list if exist
@@ -227,7 +251,7 @@ class DnsExport
     }
 
     // Send stats to syslog server (over UDP)
-    void sendStats()
+    static void sendStats()
     {
         // Create socket
         int sock;
@@ -238,7 +262,7 @@ class DnsExport
 
         // Get network host entry
         struct hostent* server;
-        if ((server = gethostbyname(this->syslogServer.c_str())) == NULL)
+        if ((server = gethostbyname(parameters.syslogServer.c_str())) == NULL)
         {
             ERR_RET("Syslog - host not found!");
         }
@@ -258,6 +282,7 @@ class DnsExport
 
         for (it = messages.begin(); it != messages.end(); it++)
         {
+            LOGGING("Sending message: " << it->c_str());
             // Send packet
             if (sendto(sock, it->c_str(), BUFSIZ, 0, (struct sockaddr*)&serverAddress, serverlen) < 0)
             {
@@ -269,7 +294,7 @@ class DnsExport
     }
 
     // Return statistics formated as syslog messages
-    list<string> getMessages()
+    static list<string> getMessages()
     {
         // Get hostname
         string hostname;
@@ -277,7 +302,7 @@ class DnsExport
         const int result = gethostname(tmp, sizeof tmp);
         hostname = tmp;
 
-        list<string> messages = {""};
+        list<string> messages;
         string message = "";
 
         // Create list of all messages
@@ -290,7 +315,7 @@ class DnsExport
             // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
             {
-                message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
                 messages.push_back(message);
                 message = "";
             }
@@ -298,7 +323,7 @@ class DnsExport
         }
 
         // At the end add last message to the list
-        message = "<134>1 " + this->getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
         messages.push_back(message);
 
         return messages;
@@ -306,7 +331,7 @@ class DnsExport
 
     // Returns the local date/time formatted as 2014-03-19 11:11:52
     // https://stackoverflow.com/questions/7411301/how-to-introduce-date-and-time-in-log-file
-    string getFormattedTime()
+    static string getFormattedTime()
     {
         timeval curTime;
         gettimeofday(&curTime, NULL);
@@ -321,6 +346,19 @@ class DnsExport
         return currentTime;
     }
 
+    // Thread sending stats to syslog server
+    static void* sendingLoop(void* time)
+    {
+        // http://www.cplusplus.com/forum/beginner/91449/
+        chrono::seconds interval(*((int*)time)); // By given parameter
+        while (true)
+        {
+            this_thread::sleep_for(interval);
+            //LOGGING("sending stats");
+
+            sendStats();
+        }
+    }
 
     /*********************************************** PUBLIC Methods ********************************************/
 
@@ -337,23 +375,23 @@ class DnsExport
             // Handle SIUGSR1
             signal(SIGUSR1, handleSig);
 
+            // Handle SIUGSR1
+            signal(SIGINT, handleSig);
+
             // Choose what to do
             
-            if (this->interface.compare(""))
+            if (parameters.interface.compare(""))
             {
-                //pthread_t t;
-                //pthread_create(&t, NULL, call_from_thread, NULL);
+                
 
                 this->sniffInterface();
-                //pthread_join(t, NULL);
-
             }
 
-            if (this->file.compare(""))
+            if (parameters.file.compare(""))
             {
                 this->sniffFile();
             }
-
+            
             return 0;
         }   
 };

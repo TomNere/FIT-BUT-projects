@@ -12,12 +12,18 @@ using namespace std;
 
 #define UDP 0x11
 #define TCP 0x06
+#define ETHERNET_DATALINK 1
+#define LINUX_SLL_DATALINK 113
+
+// For creating fake ethernet header
+const unsigned char rawheader[14] = {0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x81, 0x00};
 
 // Class holding (maybe) DNS packet
 class DnsPacket
 {
     /*********************************************** PRIVATE Variables ********************************************/
     
+    uint8_t datalink;
     uint8_t* packet;
     struct pcap_pkthdr header;
     uint16_t id;                // Only for logging
@@ -32,20 +38,63 @@ class DnsPacket
     bool getTransProt()
     {
         struct ether_header* eptr;
+        uint16_t ethType;
         struct ip* myIp;
         struct ip6_hdr* myIpv6;
         uint8_t transProtType;
 
-        // Read the ethernet header
-        eptr = (struct ether_header*)packet;
-        this->position += sizeof(struct ether_header);
+        if (this->datalink == LINUX_SLL_DATALINK)
+        {
+            //  Packet structure
+            //  +---------------------------+
+            //  |         Packet type       |
+            //  |         (2 Octets)        |
+            //  +---------------------------+
+            //  |        ARPHRD_ type       |
+            //  |         (2 Octets)        |
+            //  +---------------------------+
+            //  | Link-layer address length |
+            //  |         (2 Octets)        |
+            //  +---------------------------+
+            //  |    Link-layer address     |
+            //  |         (8 Octets)        |
+            //  +---------------------------+
+            //  |        Protocol type      |
+            //  |         (2 Octets)        |
+            //  +---------------------------+
+            //  |           Payload         |
+            //  .                           .
+            //  .                           .
+            //  .                           .
+
+            ethType = ntohs(*(uint16_t*)(packet + 14));
+            this->position += 16;
+        }
+        else if (this->datalink == ETHERNET_DATALINK)
+        {
+            // Read the ethernet header
+            eptr = (struct ether_header*)packet;
+            ethType = ntohs(eptr->ether_type);
+            this->position += sizeof(struct ether_header);
+        }
+        else
+        {
+            return false;       // Unsupported
+        }
 
         // Check ethernet type 
-        switch (ntohs(eptr->ether_type))
+        switch (ethType)
         {
             // see /usr/include/net/ethernet.h for types (ip, ip6_header...)
             case ETHERTYPE_IP:
-                myIp = (struct ip*)(packet + this->position);              
+                myIp = (struct ip*)(packet + this->position);
+
+                // Check for fragmentation
+                if (myIp->ip_off & IP_OFFMASK > 0 || myIp->ip_off & IP_MF  == 0b1)
+                {
+                    return false;
+                }
+
                 this->position += sizeof(struct ip);                // skip Ethernet IP header
                 transProtType = myIp->ip_p;
                 break;
@@ -57,7 +106,7 @@ class DnsPacket
             default:
                 return false;       // Unsupported
         }
-
+        
         // Skip position according to transport protocol type
         switch (transProtType)
         {
@@ -66,6 +115,7 @@ class DnsPacket
                 break;
             case TCP: 
                 this->position += sizeof(struct tcphdr);
+                break;
             default:
                 return false;       // Unsupported
         }
@@ -202,13 +252,14 @@ class DnsPacket
         list<DnsRR> Answers;
 
         // Initialize packet, header and position in constructor
-        DnsPacket(const uint8_t* p, const struct pcap_pkthdr* h)
+        DnsPacket(const uint8_t* p, const struct pcap_pkthdr* h, uint8_t datalink)
         {
             this->packet = (uint8_t*) p;
             this->header.ts = h->ts;
             this->header.caplen = h->caplen;
             this->header.len = h->len;
             this->position = 0;
+            this->datalink = datalink;
         }
 
         // Try to parse packet
@@ -216,6 +267,7 @@ class DnsPacket
         {
             if (this->getTransProt())
             {
+                LOGGING("DNS PARSING");
                 this->dnsParse();
             }
         }

@@ -281,15 +281,32 @@ class DnsRR
     {
         for (int i = 0; i < this->rdLength; i++)
         {
-            uint8_t ch = this->packet[this->position + i];
-            if (isprint(ch))
+            this->data += '"';
+
+            // length octet
+            uint8_t length = this->packet[this->position + i];
+
+            // Read character-string of given length
+            for (int j = 1; j <= length; j++)
             {
-                this->data += ch;
+                uint8_t ch = this->packet[this->position + i + j];
+                if (isprint(ch))
+                {
+                    this->data += ch;
+                }
+                else
+                {
+                    this->data += Helpers::ToHex(ch);
+                }
             }
-            else
-            {
-                this->data += Helpers::ToHex(ch);
-            }
+            this->data += '"';
+            this->data += " ";
+            i += length;
+        }
+
+        if (this->data.size() > 0)
+        {
+            this->data = this->data.substr(0, this->data.size()-1);   // Remove last " "
         }
     }
 
