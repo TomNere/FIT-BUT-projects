@@ -1,0 +1,30 @@
+.TH DNS-EXPORT 1
+.SH NAME
+dns-export \- process DNS protocol data and send statistics using Syslog protocol 
+.SH SYNOPSIS
+.B dns-export
+[\fB\-r\fR \fIfile.pcap\fR]
+[\fB\-i\fR \fIinterface\fR]
+[\fB\-s\fR \fIsyslog-server\fR]
+[\fB\-t\fR \fIseconds\fR]
+.SH DESCRIPTION
+.B dns-export
+parses packets of DNS protocol. It supports reading data from pcap file and sniffing the given interface.\
+ Statistics can be regularly sent to Syslog server.\
+ When sniffing interface, dns-export runs forever and statistics are sent in time interval.\
+ Other way is to send SIGUSR1 signal to dns-export and statistics are printed to standart output (stdout).\
+ Statistics syntax: domain-name rr-type rr-answer and count of occurrence of this combination (e.g. google.com A 172.217.23.238 68)
+.SH OPTIONS
+.TP
+.BR \-r =\fIfile.pcap\fR
+pcap file containing DNS packets. Statistics are printed to stdout, parameters \fB\-s\fR and \fB\-t\fR are useless, \fB\-i\fR is forbidden. 
+.TP
+.BR \-i =\fIinterface\fR
+network interfaces to sniff (e.g. enp0s3). Parameter "any" for sniffing from all interfaces is supported. Parameter \fB\-r\fR is forbidden.
+.TP
+.BR \-s =\fIsyslog-server\fR
+Syslog server where the statistics will be sent. When sniffing interface and no Syslog server provided, 
+statistics can only be printed to stdout sending SIGUSR1 signal.
+.TP
+.BR \-t =\fIseconds\fR
+Time interval in seconds. All statistics are sent to Syslog server every time when interval reached. 

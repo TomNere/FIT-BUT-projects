@@ -46,14 +46,14 @@ const string help = "Invalid parameters!\n\n"
 #define SYSLOG_PORT 514
 #define MESSAGE_SIZE 900
 
+// to_ms parameter for pcap_open_live, same value is used by wireshark
+#define TO_MS 100
+
 // Main class
 // Parse arguments and run sniffer
 class DnsExport
 {
     /*********************************************** PRIVATE Variables ********************************************/
-    
-    // For debugging
-    uint32_t packetCount = 0;
 
     // For pcap if error occures
     char errBuf[PCAP_ERRBUF_SIZE];
@@ -122,9 +122,12 @@ class DnsExport
     {
         list<DnsRecord>::iterator it; 
 
-        for(it = recordList.begin(); it != recordList.end(); it++) 
+        // Create copy (safer multithreading)
+        list<DnsRecord listToWrite = recordList
+
+        for(it = listToWrite.begin(); it != listToWrite.end(); it++) 
         {
-            cout << it->GetString();
+            cout << it->GetSimpleString() << endl;
         }
     }
 
@@ -132,7 +135,7 @@ class DnsExport
     void sniffInterface()
     {
         // Open device for sniffing 100 ms is value used by wireshark
-        if ((myPcap = pcap_open_live(parameters.interface.c_str(), BUFSIZ, true, 100, this->errBuf)) == NULL)
+        if ((myPcap = pcap_open_live(parameters.interface.c_str(), BUFSIZ, true, TO_MS, this->errBuf)) == NULL)
         {
             ERR_RET("Unable to open interface for listening. Error: " << errBuf);
         }
@@ -207,8 +210,6 @@ class DnsExport
     // Parse packet and add stats if valid and supported DNS packet
     static void pcapHandler(unsigned char* useless, const struct pcap_pkthdr* header, const uint8_t* packet)
     {
-        LOGGING("pcapHandler");
-
         // Create object and try to parse
         DnsPacket dnsPacket(packet, header, datalink);
         dnsPacket.Parse();
@@ -274,17 +275,33 @@ class DnsExport
         bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
         serverAddress.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
 
-        socklen_t serverlen = sizeof(serverAddress);
+        // Get hostname
+        string hostname;
+        char tmp [1024] = "";
+        if (!gethostname(tmp, sizeof tmp))
+        {
+            hostname = tmp;
+        }
+        else
+        {
+            // Return value != signalize error. Try to get ip address
+            struct sockaddr_in ipAddress;
+            socklen_t length = sizeof(ipAddress);
+
+            if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
+            {
+                hostname = ipAddress.sin_addr.s_addr;
+            }
+        }
 
         // Get and send all mesagges
-        list<string>messages = getMessages();
+        list<string>messages = getMessages(hostname);
         list<string>::iterator it;
 
         for (it = messages.begin(); it != messages.end(); it++)
         {
-            LOGGING("Sending message: " << it->c_str());
             // Send packet
-            if (sendto(sock, it->c_str(), BUFSIZ, 0, (struct sockaddr*)&serverAddress, serverlen) < 0)
+            if (sendto(sock, it->c_str(), BUFSIZ, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
             {
                 ERR_RET("Syslog - sendto error!");
             }
@@ -294,28 +311,25 @@ class DnsExport
     }
 
     // Return statistics formated as syslog messages
-    static list<string> getMessages()
+    static list<string> getMessages(string hostname)
     {
-        // Get hostname
-        string hostname;
-        char tmp [1024] = "";
-        const int result = gethostname(tmp, sizeof tmp);
-        hostname = tmp;
-
         list<string> messages;
-        string message = "";
+        string message;
 
         // Create list of all messages
         list<DnsRecord>::iterator it;
 
-        for (it = recordList.begin(); it != recordList.end(); it++)
+        // Create copy (safer multithreading)
+        list<DnsRecord listTosend = recordList;
+
+        for (it = listTosend.begin(); it != listTosend.end(); it++)
         {
             string record = it->GetString();
 
             // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
             {
-                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + message;
                 messages.push_back(message);
                 message = "";
             }
@@ -323,7 +337,7 @@ class DnsExport
         }
 
         // At the end add last message to the list
-        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export - - - " + message;
+        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + message;
         messages.push_back(message);
 
         return messages;
@@ -349,13 +363,15 @@ class DnsExport
     // Thread sending stats to syslog server
     static void* sendingLoop(void* time)
     {
+        // Initial sleep - waiting for pcap to start and parse something
+        chrono::miliseconds openLiveTO(TO_MS); // By given parameter
+        this_thread::sleep_for(openLiveTO + 10);
+
         // http://www.cplusplus.com/forum/beginner/91449/
         chrono::seconds interval(*((int*)time)); // By given parameter
         while (true)
         {
             this_thread::sleep_for(interval);
-            //LOGGING("sending stats");
-
             sendStats();
         }
     }
@@ -378,12 +394,15 @@ class DnsExport
             // Handle SIUGSR1
             signal(SIGINT, handleSig);
 
+            // Error
+            if (parameters.interface.compare("") && parameters.file.compare(""))
+            {
+                ERR_RET(help);
+            }
+
             // Choose what to do
-            
             if (parameters.interface.compare(""))
             {
-                
-
                 this->sniffInterface();
             }
 

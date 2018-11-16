@@ -51,7 +51,16 @@ class DnsRecord
         {
             string str;
             stringstream ss;
-            ss << this->domainName << " " << this->rrName << " " << this->rrData << " " << count << endl;
+            ss << " - - - " << this.GetSimpleString();
+            return ss.str();
+        }
+
+        // Return record in one string
+        string GetSimpleString()
+        {
+            string str;
+            stringstream ss;
+            ss << this->domainName << " " << this->rrName << " " << this->rrData << " " << count;
             return ss.str();
         }
 };

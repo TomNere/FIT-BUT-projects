@@ -26,7 +26,6 @@ class DnsPacket
     uint8_t datalink;
     uint8_t* packet;
     struct pcap_pkthdr header;
-    uint16_t id;                // Only for logging
     uint32_t position;
     uint32_t idPosition;
     uint16_t answerCount;
@@ -156,8 +155,6 @@ class DnsPacket
         // Store ID position for future use when domain name is compressed
         this->idPosition = this->position;
 
-        this->id = ntohs(*(uint16_t*)(this->packet + this->position));      // Save this for logging
-
         // Check if flags are valid for DNS packet
         // we don't care about ID (by design), qr is after 2 byte ID
         // need bitshift because QR is one bit
@@ -207,10 +204,8 @@ class DnsPacket
             // Handle error
             if (this->position == 0)
             {
-                LOGGING("Error occured when RR answer parsing. Skipping packet");
                 return;
             }
-            LOGGING("Packet " << this->id << " has data: " << answer.data);
 
             // Add to list if data exists
             if (answer.data != "")
@@ -267,7 +262,6 @@ class DnsPacket
         {
             if (this->getTransProt())
             {
-                LOGGING("DNS PARSING");
                 this->dnsParse();
             }
         }

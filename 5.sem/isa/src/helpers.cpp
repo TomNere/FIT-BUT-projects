@@ -5,14 +5,16 @@ using namespace std;
 
 /************************************** Consts and Macros  **************************************/
 
-const string red("\033[0;31m");
+// Colors for LOGGING
 const string yellow("\033[1;33m");
 const string reset("\033[0m");
 
+// Macro for error states
 #define ERR_RET(message)     \
-    cerr << red << message << " Terminating." << reset << endl; \
+    cerr << message << " Terminating." << reset << endl; \
     exit(EXIT_FAILURE);
 
+// Macro for logging data when debbuging
 #define LOGGING(message) \
     cerr << yellow << "LOG: " <<   \
     message << reset << endl;
