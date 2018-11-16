@@ -69,7 +69,7 @@
         V prvom prípade sa pred započatím odchytávania spustí funkcia \textbf{sendingLoop()},
         ktorá sa v separátnom vlákne stará o pravidelné odosielanie na Syslog server. Pre odoslanie volá funkcia \textbf{sendStats()}, ktorá si volá
         pomocné funkcie na vytvorenie správ ako napr.: \textbf{getMessages()} alebo \textbf{getFormattedTime()} a následne \emph{UDP} protokolom 
-        odosiela správy.
+        odosiela správy. Správa nie je dlhšia ako 1 kB a jednotlivé štatistiky sú oddelené znakom '|'.
 
         V druhom prípade ak nebol zadaný Syslog server, je po prečítaní súboru zavolaná funkcia \textbf{getMessages()}, ktorá štatistiky vypíše
         na štandardný výstup a aplikácia končí. Rovnaká funkcia je volaná aj pri prijatí signálu \textbf{SIGUSR1}.
@@ -107,7 +107,7 @@
     
     \section{Zaujímavé časti kódu}
         \subsection{LINUX_SLL datalink}
-        Pri počúvaní na všetkých rozhraniach ("any"), nemajú pakety ethernet hlavičku ale tzv. \emph{"linux-coocked header"}.
+        Pri odchytávaní na všetkých rozhraniach ("any"), nemajú pakety ethernet hlavičku ale tzv. \emph{"linux-coocked header"}.
         To sa dá zistiť pomocou funkcie \textbf{pcap_datalink()}. Ak ide \texttt{LINUX_SLL_DATALINK}, hlavička je parsovaná iným spôsobom ako ethernet:
         \includegraphics {datalink.png}
         \includegraphics {ethernet.png}
@@ -124,7 +124,8 @@
         \includegraphics {hostname.png}
 
         \subsection{Získanie aktuálneho timestampu}
-        Syslog správa potrebuje timestamp v špecifickom tvare. Kód je inšpirovaný vláknom na stránke stackoverflow.com\footnote{https://stackoverflow.com/questions/7411301/how-to-introduce-date-and-time-in-log-file}
+        Syslog správa potrebuje timestamp v špecifickom tvare. Kód je inšpirovaný vláknom na stránke
+        codereview.stackexchange.com\footnote{https://codereview.stackexchange.com/questions/11921/getting-current-time-with-milliseconds}
         \includegraphics {timestamp.png}
 
 
@@ -132,48 +133,25 @@
         Aplikácia vytvára správy s dĺžkou nepresahujúcou 1KB. Na Syslog server je v jednej správe posielaných viac štatistík oddelených znakom \texttt{|}.
         \includegraphics {messages.png}
 
+    \section{Použitie}
+        \subsection{Čítanie pcap súboru}
+        Aplikácia sa spúšťa s argumentmi \textbf{-r} a \textbf{-s}:\\
+        \includegraphics {r1.png}
+        V tomto prípade sa na \textbf{stdout} nič nevypíše, štatistiky sú odoslané na Syslog server, napr.:\\
+        \includegraphics {r2.png}
+        V prípade, že nie je zadaný Syslog server sa štatistiky vypíšu na \textbf{stdout}:\\
+        \includegraphics {r3.png}
 
-    Ako tím sme sa začali schádzať prakticky ihneď po zaregistrovaní nášho zadania. Stretávali sme sa 
-    zvyčajne raz do týždňa. Vždy sme prediskutovali aktuálny stav práve implementovaných častí 
-    a ďalší postup či korekcie v~zdrojovom kóde. Ako komunikačný kanál sme využívali prevažne 
-    skupinovú konverzáciu na sociálnej sieti Facebook. Bolo to jednoduché a efektívne riešenie.
+        \subsection{Odchytávanie na rozhraní}
+        Aplikácia sa spúšťa s argumentmi \textbf{-i}, \textbf{-s} a \textbf{-t}:\\
+        \includegraphics {i1.png}
+        V tomto prípade budú štatistiky odosielané na Syslog server každých 45 sekúnd. Ak nie je zadaný argument \textbf{-t},
+        štatistiky sú odosielané každých 60 sekúnd. Ak nie je zadaný argument \textbf{-s}, štatistiky sa neodosielajú.
 
-    Prácu sme sa snažili rozdeľovať rovnomerne medzi všetkých členov tímu, čo sa nám nepodarilo vždy. 
-    Po pridelení úlohy sme stanovili deadline, aby sme mohli čo najskôr pokračovať na nasledujúcej časti projektu. 
-    Jednotlivé časti sme sa snažili implementovať paralelne s~preberanou látkou na prednáškach, aby sme sa vyhli chybám z dôvodu neznalosti.
-    
-
-        \subsection{Správa zdrojového kódu}
-        Pre správu a zdielanie zdrojových súborov sme využili verzovací systém \emph{Git} a webovú službu GitHub pre vzdialené ukladanie, ktorú sme už počas štúdia využili na verzovanie projektov v~iných predmetoch.
-        
-        Na sledovanie postupu pri plnení pridelených úloh a oznamovanie nájdených chýb 
-        sme využívali nástroj Trello, ktorý slúži ako online kanban pre sledovanie projektov. 
-        
-        Vďaka týmto informačným kanálom mohli mať všetci členovia tímu prístup k~najaktuálnejšej
-        verzii projektu a reagovať na vzniknuté chyby efektívne.
-
-        \subsection{Rozdelenie práce v tíme}
-
-        \textbf{Tomáš Nereča} pracoval na implementácii lexikálneho analyzátora a v neskoršej fáze vývoja pomáhal pri implementácii niektorých
-        funkcií precedenčnej syntaktickej analýzy. Okrem toho sa podieľal na menších moduloch symtable, errors, stack a ifunc.  
-
-        \textbf{Jiří Vozár} mal na starosti vedenie implementácie, návrh komunikácie medzi modulmi a implementáciu syntaktickej analýzy rekurzívnym zostupom.
-
-        \textbf{Samuel Obuch} pracoval na implementácii precedenčnej syntaktickej analýzy, vytvoril regresné testy a vypracoval pomocný modul strings pre lexikálny analyzátor.
-
-        \textbf{Ján Farský} vypracoval základné jednotkové testy pre lexikálny analyzátor, vytvoril precedenčnú tabuľku, pracoval na module ifunc a napísal základ dokumentácie.
-
-        Dôvodom nerovnomerného rozdelenia bodov bolo nedostatočné splnenie úloh jedného 
-        z~členov tímu, čo viedlo k nutnosti zapojiť k týmto úlohám iných členov tímu.
-
-    \section{Záver}
-    S~projektom podobného rozsahu sa ešte nikto z~nás predtým nestretol, preto ho považujeme za dobrú
-    skúsenosť pre každého z~nás. Pri jeho riešení sme prakticky využili získané vedomosti z~predmetov 
-    IFJ a IAL.
-    
-    Pre správne fungovanie tímu bolo potrebné kvalitné riadenie a pridelovanie úloh a pravideľná
-    komunikácia medzi jednotlivými členmi tímu. Výsledkom tejto práce je funkčný a z~nášho pohľadu vydarený 
-    prekladač jazyka IFJ17.
+        \subsection{Zaslanie signálu SIGUSR1}
+        Pri odchytávaní na rozhraní sa štatistiky vypíšu na \textbf{stdout} pri zaslaní signálu \texttt{SIGUSR1}:\\
+        \includegraphics {i2.png}
+        \includegraphics {i3.png}
     
     \newpage
     \section{Prílohy}
