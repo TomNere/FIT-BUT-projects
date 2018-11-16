@@ -1,0 +1,250 @@
+\documentclass{article}
+\usepackage[slovak]{babel}
+\usepackage[utf8]{inputenc}
+
+\usepackage{indentfirst}
+\usepackage{graphicx}
+
+\begin{document}
+    \begin{titlepage}
+        \begin{center}
+            \textsc{\Huge Vysoké učení technické v~Brně\\
+            		\huge Fakulta informačních technologií\\}
+            \vspace{\stretch{0.382}}
+            {\LARGE ISA - Síťové aplikace a~správa sítí\\}\vspace{2em}
+            {\Large dokumentácia k 2.variante projektu\\}\vspace{2em}
+            \Huge dns-export\\
+            \vspace{\stretch{0.618}}
+        \end{center}
+        {\Large \today \hfill Tomáš Nereča}\vspace{-2em}
+    \end{titlepage}
+
+    \tableofcontents
+        \thispagestyle{empty}
+        \newpage
+        \setcounter{page}{1}
+    \newpage
+    
+    \section{Úvod}
+
+        \textbf{dns-export} je aplikácia na spracovávanie dát protokolu \emph{DNS (Domain Name System)}.
+        Aplikácia teda musí vedieť identifikovať a spracovať \emph{paket} daného protokolu.
+        Jednotlivé pakety môže buď čerpať z \emph{pcap} súboru alebo odchytávať v reálnom čase
+        zo sieťového rozhrania.
+
+        Zo spracovaných dát vytvára štatistiky, ktoré v časovom intervale posiela protokolom \emph{Syslog}
+        na centrálny logovací server alebo jednoducho vypisuje na štandardný výstup. 
+    
+    \section{Návrh aplikácie}
+
+        \subsection{Objektový návrh}
+        Svoju aplikáciu som sa rozhodol naprogramovať objektovo. Dodržiaval som štruktúru jedna \emph{trieda}
+        na jeden zdrojový súbor. Každá trieda má svoju významom vyhradenú funkciu. 
+
+        \subsection{Spracovanie paketov}
+        Aplikácia spracuje vstupné argumenty a po ich validácii sa buď spustí spracovanie pcap súboru, alebo odchytávanie
+        paketov zo sieťového rozhrania. Pre každý spracovávaný paket sa vytvorí objekt držiaci dáta paketu.
+
+        V tomto objekte sa najprv spracujú jednotlivé hlavičky paketu. Ak sa zistí, že paket obsahuje odpovede na DNS otázky,
+        Vytvorí sa pre každú odpoveď objekt, ktorý tieto odpovede spracováva.
+
+        \subsection{Ukladanie štatistík}
+        Po úspešnom spracovaní odpovedí sa každá odpoveď pridá do objektu, ktorý obsahuje kolekciu všetkých nazbieraných štatistík.
+        Pomocou metódy sa zistí, či sa daná štatistická informácia v objekte už nachádza a v tom prípade sa len inkrementuje počítadlo.
+        
+        \subsection{Odosielanie a výpis štatistík}
+        Po prečítaní z pcap súboru sa štatistiky uložené v objekte odošlú na server ak je zadaný alebo vypíšu na štandardný výstup.
+        V prípade živého odchytávania sa pred jeho spustením vytvorí separátne vlákno, ktoré bude v zadanom časovom intervale
+        odosielať všetky doposiaľ nazbierané štatistiky. Okrem toho bude aplikácia pri odchytení signálu \textbf{SIGUSR1} volať funkciu
+        na výpis štatistík na štandardný výstup.
+        
+    \section{implementácia}
+    
+        \subsection{DnsExport}
+        Po spustení aplikácie je vytvorený objekt tejto triedy a zavolaná funkcia \textbf{Main()}. Nastaví sa odchýtavanie signálov
+        a na základne vstupných argumentov načítaných pomocou vstavanej funkcie \textsc{getopt()}\footnote{http://man7.org/linux/man-pages/man3/getopt.3.html} sa rozhodne, či sa spustí funkcia
+        \textbf{sniffInterface()} alebo \textbf{sniffFile()}. 
+        
+        V prvom prípade sa pred započatím odchytávania spustí funkcia \textbf{sendingLoop()},
+        ktorá sa v separátnom vlákne stará o pravidelné odosielanie na Syslog server. Pre odoslanie volá funkcia \textbf{sendStats()}, ktorá si volá
+        pomocné funkcie na vytvorenie správ ako napr.: \textbf{getMessages()} alebo \textbf{getFormattedTime()} a následne \emph{UDP} protokolom 
+        odosiela správy.
+
+        V druhom prípade ak nebol zadaný Syslog server, je po prečítaní súboru zavolaná funkcia \textbf{getMessages()}, ktorá štatistiky vypíše
+        na štandardný výstup a aplikácia končí. Rovnaká funkcia je volaná aj pri prijatí signálu \textbf{SIGUSR1}.
+
+        O všetky akcie ohľadom odchytávania paketov sa stará knižnica \textbf{libpcap}\footnote{https://www.tcpdump.org/pcap.html}. Pre každý paket
+        je volaná \emph{callback} funkcia \textbf{pcapHandler()}. Tam je vytvorený objekt triedy \textbf{DnsPacket} a zavolaná funkcia \textbf{Parse()}.
+
+        Ak boli v pakete nájdené validné DNS odpovede, je zavolaná funkcia \textbf{addRecords()}, ktorá do globálnej premennej \textbf{recordList} pridá nový
+        objekt triedy \textbf{DnsRecord}, ak sa daná štatistika v liste ešte nenachádza, alebo len zvýši počítadlo u nájdenej štatistiky.
+
+
+
+    
+    \section{Práca v~tíme}
+    Ako tím sme sa začali schádzať prakticky ihneď po zaregistrovaní nášho zadania. Stretávali sme sa 
+    zvyčajne raz do týždňa. Vždy sme prediskutovali aktuálny stav práve implementovaných častí 
+    a ďalší postup či korekcie v~zdrojovom kóde. Ako komunikačný kanál sme využívali prevažne 
+    skupinovú konverzáciu na sociálnej sieti Facebook. Bolo to jednoduché a efektívne riešenie.
+
+    Prácu sme sa snažili rozdeľovať rovnomerne medzi všetkých členov tímu, čo sa nám nepodarilo vždy. 
+    Po pridelení úlohy sme stanovili deadline, aby sme mohli čo najskôr pokračovať na nasledujúcej časti projektu. 
+    Jednotlivé časti sme sa snažili implementovať paralelne s~preberanou látkou na prednáškach, aby sme sa vyhli chybám z dôvodu neznalosti.
+    
+
+        \subsection{Správa zdrojového kódu}
+        Pre správu a zdielanie zdrojových súborov sme využili verzovací systém \emph{Git} a webovú službu GitHub pre vzdialené ukladanie, ktorú sme už počas štúdia využili na verzovanie projektov v~iných predmetoch.
+        
+        Na sledovanie postupu pri plnení pridelených úloh a oznamovanie nájdených chýb 
+        sme využívali nástroj Trello, ktorý slúži ako online kanban pre sledovanie projektov. 
+        
+        Vďaka týmto informačným kanálom mohli mať všetci členovia tímu prístup k~najaktuálnejšej
+        verzii projektu a reagovať na vzniknuté chyby efektívne.
+
+        \subsection{Rozdelenie práce v tíme}
+
+        \textbf{Tomáš Nereča} pracoval na implementácii lexikálneho analyzátora a v neskoršej fáze vývoja pomáhal pri implementácii niektorých
+        funkcií precedenčnej syntaktickej analýzy. Okrem toho sa podieľal na menších moduloch symtable, errors, stack a ifunc.  
+
+        \textbf{Jiří Vozár} mal na starosti vedenie implementácie, návrh komunikácie medzi modulmi a implementáciu syntaktickej analýzy rekurzívnym zostupom.
+
+        \textbf{Samuel Obuch} pracoval na implementácii precedenčnej syntaktickej analýzy, vytvoril regresné testy a vypracoval pomocný modul strings pre lexikálny analyzátor.
+
+        \textbf{Ján Farský} vypracoval základné jednotkové testy pre lexikálny analyzátor, vytvoril precedenčnú tabuľku, pracoval na module ifunc a napísal základ dokumentácie.
+
+        Dôvodom nerovnomerného rozdelenia bodov bolo nedostatočné splnenie úloh jedného 
+        z~členov tímu, čo viedlo k nutnosti zapojiť k týmto úlohám iných členov tímu.
+
+    \section{Záver}
+    S~projektom podobného rozsahu sa ešte nikto z~nás predtým nestretol, preto ho považujeme za dobrú
+    skúsenosť pre každého z~nás. Pri jeho riešení sme prakticky využili získané vedomosti z~predmetov 
+    IFJ a IAL.
+    
+    Pre správne fungovanie tímu bolo potrebné kvalitné riadenie a pridelovanie úloh a pravideľná
+    komunikácia medzi jednotlivými členmi tímu. Výsledkom tejto práce je funkčný a z~nášho pohľadu vydarený 
+    prekladač jazyka IFJ17.
+    
+    \newpage
+    \section{Prílohy}
+        \subsection{Diagram konečného automatu}
+            \newpage
+            
+        \subsection{LL gramatika}
+            \begin{enumerate}
+                % NESAHAT - zhenodnotí čísla v tabulce LL gramatiky!
+                \item \texttt{<program> -> declare function <functionDecl> eol <program>}
+                \item \texttt{<program> -> function <functionDef> eol <program>}
+                \item \texttt{<program> -> scope <statementList> end scope}
+                
+                \item \texttt{<functionDecl> -> <functionHeader>}
+                \item \texttt{<functionDef> -> <functionHeader> eol <statementList> end function}
+                
+                \item \texttt{<functionHeader> -> identifier ( <functionParams> ) as type}
+                
+                \item \texttt{<functionParams> -> <functionParam> <nextFuncParam>}
+                \item \texttt{<functionParams> -> epsilon}
+                
+                \item \texttt{<nextFuncParam> -> , <functionParam> <nextFuncParam>}
+                \item \texttt{<nextFuncParam> -> epsilon}
+                
+                \item \texttt{<functionParam> -> identifier as type}
+                
+                \item \texttt{<statementList> -> <statement> eol <statementList>}
+                \item \texttt{<statementList> -> epsilon}
+                
+                \item \texttt{<statement> -> dim <declaration>}
+                \item \texttt{<statement> -> identifier = <expression>}
+                \item \texttt{<statement> -> input identifier}
+                \item \texttt{<statement> -> print <printArgs>}
+                \item \texttt{<statement> -> if <expression> then eol <statementList> <else>}
+                \item \texttt{<statement> -> do while <expression> eol <statementList> loop}
+                \item \texttt{<statement> -> return identifier}
+                
+                \item \texttt{<declaration> -> identifier as type}
+                \item \texttt{<declaration> -> identifier as type = <expression>}
+                
+                \item \texttt{<printArgs> -> <expression> ;}
+                \item \texttt{<printArgs> -> <expression> ; <printArgs>}
+                
+                \item \texttt{<else> -> elseif <expression> then eol <else> end if}
+                \item \texttt{<else> -> else eol <statementList> end if}
+                \item \texttt{<else> -> end if}
+                
+                \item \texttt{<expression> ->} vyhodnocuje se precedenční syntaktickou analýzou
+            \end{enumerate}
+        \newpage
+        
+        \subsection{LL tabuľka}
+        \newcommand{\tterm}[1]{\rotatebox[origin=c]{90}{\texttt{#1}}}
+            \begin{tabular}{|r|*{10}{c|}}
+                \hline
+                & \tterm{declare} & \tterm{function} & \tterm{scope} & \tterm{identifier} & \tterm{dim} &
+                \tterm{input} & \tterm{print} & \tterm{if} & \tterm{do} & \tterm{return} \\\hline \hline
+                \texttt{<program>} & 1 & 2 & 3 &&&&&&& \\\hline
+                \texttt{<functionDecl>} &&&& 4 &&&&&& \\\hline
+                \texttt{<functionDef>} &&&& 5 &&&&&& \\\hline
+                \texttt{<functionHeader>} &&&& 6 &&&&&& \\\hline
+                \texttt{<functionParams>} &&&& 7, 8 &&&&&& \\\hline
+                \texttt{<nextFuncParam>} &&&&&&&&&& \\\hline
+                \texttt{<functionParam>} &&&& 11 &&&&&& \\\hline
+                \texttt{<statementList>} &&&& 12 & 12 & 12 & 12 & 12 & 12 & 12 \\\hline
+                \texttt{<statement>} &&&& 15 & 14 & 16 & 17 & 18 & 19 & 20 \\\hline
+                \texttt{<declaration>} &&&& 21, 22&&&&&& \\\hline
+                \texttt{<else>} &&&& 23, 24&&&&&& \\\hline
+            \end{tabular}
+            
+            \begin{tabular}{|r|*{9}{c|}}
+                \hline
+                & \tterm{elseif} & \tterm{else} & \tterm{end} & \tterm{loop} & \tterm{eol} &
+                \tterm{(} & \tterm{)} & \tterm{=} & \tterm{,} \\\hline \hline
+                \texttt{<program>} &&&&&&&&& \\\hline
+                \texttt{<functionDecl>} &&&&&&&&& \\\hline
+                \texttt{<functionDef>} &&&&&&&&& \\\hline
+                \texttt{<functionHeader>} &&&&&&&&& \\\hline
+                \texttt{<functionParams>} &&&&&&& 8 && \\\hline
+                \texttt{<nextFuncParam>} &&&&&&& 10 && 9 \\\hline
+                \texttt{<statementList>} & 13 & 13 & 13 & 13 &&&&& \\\hline
+                \texttt{<statement>} &&&&&&&&& \\\hline
+                \texttt{<declaration>} &&&&&& 23, 24&&& \\\hline
+                \texttt{<else>} & 25 & 26 & 27 &&&&&& \\\hline
+            \end{tabular}
+        \newpage
+
+        \subsection{Precedenčná tabuľka}
+
+        \begin{center}
+        \begin{tabular}{|c||c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+        \hline
+                    &  =  & $<>$ & $<$= & $>$= & $<$ & $>$ &  +  &  -  &  *   &  /  & \textbackslash &  (  &  )  & \$  \\ 
+        \hline
+        \hline  
+           =        & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\ 
+        \hline  
+          $<>$      & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline  
+          $<$=      & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline  
+          $>$=      & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline  
+          $<$       & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline        
+          $>$       & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline  
+           +        & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $>$ & $>$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\
+        \hline  
+           -        & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $>$ & $>$ &  $<$ & $<$ & $<$            & $<$ & $>$ & $>$ \\ 
+        \hline  
+          */        & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $>$ & $>$ &  $>$ & $>$ & $>$            & $<$ & $>$ & $>$ \\ 
+        \hline  
+\textbackslash      & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $>$ & $>$ &  $<$ & $<$ & $>$            & $<$ & $>$ & $>$ \\
+        \hline  
+           (        & $<$ &  $<$ &  $<$ &  $<$ & $<$ & $<$ & $<$ & $<$ &  $<$ & $<$ & $<$            & $<$ &  =  &     \\  
+        \hline  
+           (        & $>$ &  $>$ &  $>$ &  $>$ & $>$ & $>$ & $>$ & $>$ &  $>$ & $>$ & $>$            &     & $>$ & $>$ \\ 
+        \hline  
+          \$        & $<$ &  $<$ &  $<$ &  $<$ & $<$ & $<$ & $<$ & $<$ &  $<$ & $<$ &  $<$            & $<$ &     &     \\ 
+        \hline  
+        \end{tabular}
+    \end{center}
+\end{document}
