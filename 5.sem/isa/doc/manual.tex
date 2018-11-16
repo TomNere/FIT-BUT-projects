@@ -33,7 +33,8 @@
         zo sieťového rozhrania.
 
         Zo spracovaných dát vytvára štatistiky, ktoré v časovom intervale posiela protokolom \emph{Syslog}
-        na centrálny logovací server alebo jednoducho vypisuje na štandardný výstup. 
+        na centrálny logovací server alebo jednoducho vypisuje na štandardný výstup. Zbierané štatistiky sú
+        \texttt{domain-name rr-type rr-answer count}.
     
     \section{Návrh aplikácie}
 
@@ -60,7 +61,7 @@
         
     \section{implementácia}
     
-        \subsection{DnsExport}
+        \subsection{DnsExport.cpp}
         Po spustení aplikácie je vytvorený objekt tejto triedy a zavolaná funkcia \textbf{Main()}. Nastaví sa odchýtavanie signálov
         a na základne vstupných argumentov načítaných pomocou vstavanej funkcie \textsc{getopt()}\footnote{http://man7.org/linux/man-pages/man3/getopt.3.html} sa rozhodne, či sa spustí funkcia
         \textbf{sniffInterface()} alebo \textbf{sniffFile()}. 
@@ -76,13 +77,62 @@
         O všetky akcie ohľadom odchytávania paketov sa stará knižnica \textbf{libpcap}\footnote{https://www.tcpdump.org/pcap.html}. Pre každý paket
         je volaná \emph{callback} funkcia \textbf{pcapHandler()}. Tam je vytvorený objekt triedy \textbf{DnsPacket} a zavolaná funkcia \textbf{Parse()}.
 
-        Ak boli v pakete nájdené validné DNS odpovede, je zavolaná funkcia \textbf{addRecords()}, ktorá do globálnej premennej \textbf{recordList} pridá nový
+        Ak boli v pakete nájdené validné DNS odpovede - \emph{answers}, je zavolaná funkcia \textbf{addRecords()}, ktorá do globálnej premennej \textbf{recordList} pridá nový
         objekt triedy \textbf{DnsRecord}, ak sa daná štatistika v liste ešte nenachádza, alebo len zvýši počítadlo u nájdenej štatistiky.
 
+        \subsection{DnsPacket.cpp}
+        Vo funkcii \textbf{Parse()} je najprv zavolaná funkcia \textbf{getTransProt()}. Tá parsuje \emph{ethernet} hlavičku (podporované typy sú IPv4 a IPv6)
+        a následne zistí transportný protokol (podporované typy sú UDP a TCP) a skočí na pozíciu, kde by sa mala nachádzať DNS hlavička.
 
+        Parsovanie DNS hlavičky začína vo funkcii \textbf{dnsParse()}. Tam prebehnú validácie, či ide skutočne o DNS paket. \emph{query} pakety sú
+        ignorované, aplikácia pracuje len s answers. Ak sú nájdené answers, je zavolaná funkcia \textbf{parseRRSet()}, kde je hneď na začiatku zavolaná funkcia \textbf{skipQuestion()}, ktorá
+        skočí na pozíciu prvej answer.
 
+        Pre každú answer je vytvorený objekt triedy \textbf{DnsRR}, ktorý spracuje dáta a nastaví pozíciu na ďalšiu answer. Ak boli získané nejaké dáta, objekt je uložený do listu
+        \textbf{Answers}.
+
+        \subsection{DnsRR.cpp}
+        Každá answer začína \emph{domain-name}, ktorý je získaný funkciou \textbf{readDomainName()}. Ak sa podarí získať domain-name, nasleduje získanie typu záznamu - \emph{rr-type} a dĺžky dát.
+        Vo funkcii \textbf{applyParser()} je \textbf{switch}, v ktorom sa na základe typu záznamu rozhodne ktorý z parserov\footnote{Konkrétnejší popis jednotlivých parserov je v komentároch v zdrojovom kóde.} pre dáta použiť. Okrem toho sa typ uloží ako \emph{string}
+        hodnota pre jednoduchšie ukladanie štatistík. Ak sa podarilo získať dáta, je vrátená pozícia za odpoveďou a aplikácia pokračuje parsovaním ďalšej answer.
+
+        \subsection{Helpers.cpp}
+        Táto trieda obsahuje makrá pre logovanie \textbf{LOGGING} a ukončovanie aplikácie ak nastane problém \textbf{ERR_RET} pomocné statické funkcie.
+
+        Funkcia \textbf{ToHex()} prevedie netlačiteľný znak do hexadecimálneho tvaru, napr.: \texttt{0x01}. Je používaná ak sa napríklad v domain-name alebo \texttt{TXT}
+        zázname objaví netlačiteľný znak.
+
+        Funkcia \textbf{Base64Encode()} je využívaná parseroch pre záznamy typu \texttt{DNSKEY, DS a RRSIG}. Kóduje bajtové pole ako base64 string, ktorý sa zobrazí v štatistikách.
+        Funkcia je dostupná na githube\footnote{https://github.com/ReneNyffenegger/cpp-base64/blob/master/base64.cpp} pod \emph{Zlib} licenciou. 
     
-    \section{Práca v~tíme}
+    \section{Zaujímavé časti kódu}
+        \subsection{LINUX_SLL datalink}
+        Pri počúvaní na všetkých rozhraniach ("any"), nemajú pakety ethernet hlavičku ale tzv. \emph{"linux-coocked header"}.
+        To sa dá zistiť pomocou funkcie \textbf{pcap_datalink()}. Ak ide \texttt{LINUX_SLL_DATALINK}, hlavička je parsovaná iným spôsobom ako ethernet:
+        \includegraphics {datalink.png}
+        \includegraphics {ethernet.png}
+
+        \subsection{Odosielanie na Syslog}
+        Pri spustení vlákna na odosielanie sa najprv vyčká 20 ms a až potom sa spustí cyklus na odosielanie. Pretože aplikácia využíva parameter \textbf{to_ms}
+        vo funkcii \textbf{pcap_open_live()}, chceme aby sa stihli vytvoriť všetky štatistiky pred odoslaním. Kód je inšpirovaný vláknom na stránke
+        cplusplus.com\footnote{http://www.cplusplus.com/forum/beginner/91449/}
+        \includegraphics {loop.png}
+
+        \subsection{Pole "hostname" v Syslog správe}
+        RFC 5424\footnote{https://tools.ietf.org/html/rfc5424} špecifikuje prioritu. Aplikácia nepredpokladá existenciu FQDN ani statickú IP adresu, preto
+        sa najprv pokúsi získať hostname a až v prípade neúspechu ip adresu.
+        \includegraphics {hostname.png}
+
+        \subsection{Získanie aktuálneho timestampu}
+        Syslog správa potrebuje timestamp v špecifickom tvare. Kód je inšpirovaný vláknom na stránke stackoverflow.com\footnote{https://stackoverflow.com/questions/7411301/how-to-introduce-date-and-time-in-log-file}
+        \includegraphics {timestamp.png}
+
+
+        \subsection{Vytvorenie správ na odoslanie}
+        Aplikácia vytvára správy s dĺžkou nepresahujúcou 1KB. Na Syslog server je v jednej správe posielaných viac štatistík oddelených znakom \texttt{|}.
+        \includegraphics {messages.png}
+
+
     Ako tím sme sa začali schádzať prakticky ihneď po zaregistrovaní nášho zadania. Stretávali sme sa 
     zvyčajne raz do týždňa. Vždy sme prediskutovali aktuálny stav práve implementovaných častí 
     a ďalší postup či korekcie v~zdrojovom kóde. Ako komunikačný kanál sme využívali prevažne 
