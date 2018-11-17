@@ -7,6 +7,7 @@
 #include <string.h>     // bzero, bcopy
 #include <netdb.h>      // gethostbyname...
 #include <thread>       // Sending loop
+#include <arpa/inet.h>  // inet_pton
 
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
@@ -108,7 +109,11 @@ class DnsExport
     {
         if (sigNum == SIGUSR1)
         {
-            writeStats();
+            // Working just with interface sniffing
+            if (!parameters.file.compare(""))
+            {
+                writeStats();
+            }
         }
         else if (sigNum == SIGINT)
         {
@@ -270,26 +275,48 @@ class DnsExport
     // Send stats to syslog server (over UDP)
     static void sendStats()
     {
-        // Create socket
         int sock;
-        if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) <= 0)
-        {
-            ERR_RET("Syslog - socket creating error!");
-        }
-
-        // Get network host entry
-        struct hostent* server;
-        if ((server = gethostbyname(parameters.syslogServer.c_str())) == NULL)
-        {
-            ERR_RET("Syslog - host not found!");
-        }
-
-        // Create necessary structures
         struct sockaddr_in serverAddress;
-        bzero((char*) &serverAddress, sizeof(serverAddress));
-        serverAddress.sin_family = AF_INET;
-        bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
-        serverAddress.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
+        struct sockaddr_in6 serverIPv6Address;
+        bool ipv6 = false;
+
+        // Check if IPv6 address
+        if (parameters.syslogServer.find_first_of(":") != string::npos)
+        {
+            ipv6 = true;
+
+            // Create socket
+            if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) <= 0)
+            {
+                ERR_RET("Syslog - IPv6 socket creating error! Code: " << errno);
+            }
+
+            serverIPv6Address.sin6_family = AF_INET6;
+            serverIPv6Address.sin6_port = htons(SYSLOG_PORT);
+            inet_pton(AF_INET6, parameters.syslogServer.c_str(),  &serverIPv6Address.sin6_addr);
+        }
+        // IPv4 or hostname
+        else
+        {
+            // Create socket
+            if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) <= 0)
+            {
+                ERR_RET("Syslog -  IPv4 socket creating error! Code: " << errno);
+            }
+
+            // Get network host entry
+            struct hostent* server;
+            if ((server = gethostbyname(parameters.syslogServer.c_str())) == NULL)
+            {
+                ERR_RET("Syslog - host not found!");
+            }
+
+            // Initialize necessary structures
+            bzero((char*) &serverAddress, sizeof(serverAddress));
+            serverAddress.sin_family = AF_INET;
+            bcopy((char*)server->h_addr, (char*)&serverAddress.sin_addr.s_addr, server->h_length);
+            serverAddress.sin_port = htons(SYSLOG_PORT);        // Port is string, need conversion
+        }
 
         // Get hostname
         string hostname;
@@ -301,12 +328,27 @@ class DnsExport
         else
         {
             // Return value != signalize error. Try to get ip address
-            struct sockaddr_in ipAddress;
-            socklen_t length = sizeof(ipAddress);
-
-            if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
+            if (ipv6)
             {
-                hostname = ipAddress.sin_addr.s_addr;
+                struct sockaddr_in6 ipAddress;
+                socklen_t length = sizeof(ipAddress);
+                char hostnameChar[INET_ADDRSTRLEN];
+
+                if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
+                {
+                    inet_ntop(AF_INET6, ipAddress.sin6_addr.s6_addr, hostnameChar, length);
+                    hostname = hostnameChar;
+                }
+            }
+            else
+            {
+                struct sockaddr_in ipAddress;
+                socklen_t length = sizeof(ipAddress);
+
+                if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
+                {
+                    hostname = ipAddress.sin_addr.s_addr;
+                }
             }
         }
 
@@ -316,11 +358,20 @@ class DnsExport
 
         for (it = messages.begin(); it != messages.end(); it++)
         {
-            LOGGING(*it);
-            // Send packet
-            if (sendto(sock, it->c_str(), it->length() + 1, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // + 1 for '\0' character 
+            if (ipv6)
             {
-                ERR_RET("Syslog - sendto error!");
+                if (sendto (sock, it->c_str(), it->length() + 1, 0, (struct sockaddr*)&serverIPv6Address, sizeof(serverIPv6Address)) < 0)
+                {
+                    ERR_RET("Syslog - IPv6 sendto error! Code: " << errno);
+                }
+            }
+            else
+            {
+                // Send packet
+                if (sendto(sock, it->c_str(), it->length() + 1, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // + 1 for '\0' character 
+                {
+                    ERR_RET("Syslog -  IPv4 sendto error! Code: " << errno);
+                }
             }
         }
 
@@ -332,13 +383,11 @@ class DnsExport
     {
         list<string> messages;
         string message;
+        
+        list<DnsRecord>::iterator it;
+        list<DnsRecord> listTosend = recordList;    // Create copy (safer multithreading)
 
         // Create list of all messages
-        list<DnsRecord>::iterator it;
-
-        // Create copy (safer multithreading)
-        list<DnsRecord> listTosend = recordList;
-
         for (it = listTosend.begin(); it != listTosend.end(); it++)
         {
             string record = it->GetString();
@@ -346,7 +395,7 @@ class DnsExport
             // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
             {
-                message.erase(0, 3);
+                message.erase(0, 3);        // Remove leading |
                 message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
                 messages.push_back(message);
                 message = "";
@@ -355,8 +404,13 @@ class DnsExport
             record = " | " + record;
             message += record;
         }
+
+        message.erase(0, 3);    // Remove leading |
         
-        message.erase(0, 3);
+        if (messages.size() == 0 && !message.compare(""))
+        {
+            message = "No DNS packets found";
+        }
 
         // At the end add last message to the list
         message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
