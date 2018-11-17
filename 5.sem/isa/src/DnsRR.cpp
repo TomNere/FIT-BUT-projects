@@ -31,7 +31,7 @@ class DnsRR
         {
             name = ".";
         }
-        
+
         return name;
     }
 
@@ -221,7 +221,7 @@ class DnsRR
         //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
         // A 16 bit integer which specifies the preference given to
-        // this RR among others at the same owner.  Lower values are prefered
+        // this RR among others at the same owner. Lower values are prefered
         uint16_t preference = ntohs(*(uint16_t*)(this->packet + this->position));
 
         uint32_t tmp = this->position + 2;
@@ -448,7 +448,7 @@ class DnsRR
         string signature = Helpers::Base64Encode(this->packet + position, this->position + rdLength - position);
     
         stringstream ss;
-        ss << '"' << typeCovered << " " << algorithm << " " << labels << " " << oTTL << " " << sigExp 
+        ss << '"' << typeCovered << " " << (int)algorithm << " " << (int)labels << " " << oTTL << " " << sigExp 
            << " " << sigInc << " " << keyTag << " " << signerName << " " << signature << '"';
         this->data = ss.str();
     }
@@ -546,8 +546,8 @@ class DnsRR
                 return 0;
             }
 
-            this->type = packet[this->position + 1];        // RR type
-            this->rdLength = packet[this->position + 9];    // data length
+            this->type = ntohs(*(uint16_t*)(this->packet + this->position));               // RR type
+            this->rdLength = ntohs(*(uint16_t*)(this->packet + this->position + 8));    // data length
 
             // Check if data are here
             if (header.len < (initPos + 10 + this->rdLength))
