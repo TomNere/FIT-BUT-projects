@@ -79,6 +79,7 @@ class DnsPacket
         }
         else
         {
+            LOGGING("Unsupported ethernet header");
             return false;       // Unsupported
         }
 
@@ -92,6 +93,7 @@ class DnsPacket
                 // Check for fragmentation
                 if (myIp->ip_off & IP_OFFMASK > 0 || myIp->ip_off & IP_MF  == 0b1)
                 {
+                    LOGGING("Fragmented packet");
                     return false;
                 }
 
@@ -108,6 +110,7 @@ class DnsPacket
                 transProtType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
                 break;
             default:
+                LOGGING("Unsupported ethernet type");
                 return false;       // Unsupported
         }
         
@@ -122,12 +125,22 @@ class DnsPacket
                 break;
             case TCP:
                 tcpHeader = (struct tcphdr*)(packet + this->position);   // Get TCP header
-                this->position += tcpHeader->th_off * 4;                                // Skip TCP header
+
+                // Skip TCP header
+                // https://stackoverflow.com/questions/6639799/calculate-size-and-start-of-tcp-packet-data-excluding-header
+                // https://stackoverflow.com/questions/21893601/no-member-th-seq-in-struct-tcphdr-working-with-pcap
+                #if (defined (__FAVOR_BSD))
+                    len -= sizeof (uint32_t) * tcp->th_off;
+                    this->position += tcpHeader->th_off * 4;
+                #else
+                  this->position += tcpHeader->doff * 4;
+                #endif
 
                 // Skip length field in DNS header - this field is only in TCP packet
                 this->position += 2;
                 break;
             default:
+                LOGGING("Unsupported transport protocol");
                 return false;       // Unsupported
         }
 
@@ -161,6 +174,7 @@ class DnsPacket
         // 2 byte ID, 2 bytes of flags, and 4 x 2 bytes of counts.
         if (this->header.len - this->position < 12)
         {
+            LOGGING("Skipping packet, invalid header.");
             return;     // Skip this packet...
         }
 
@@ -173,6 +187,7 @@ class DnsPacket
         uint8_t qr = packet[this->position + 2] >> 7;
         if (qr == 0)
         {
+            LOGGING("Skipping packet, it's query.");
             return;     // Message is query, skip
         }
         
@@ -181,6 +196,7 @@ class DnsPacket
         uint8_t rcode = packet[this->position + 3] & 0b00001111;
         if (rcode > 5)
         {
+            LOGGING("Skipping packet, rcode = " << hex << (int)rcode);
             return;     // > 5 signalize errors
         }
 
@@ -188,11 +204,13 @@ class DnsPacket
         uint16_t qdcount = ntohs(*(uint16_t*)(this->packet + this->position + 4));
         if (qdcount != 1)
         {
+            LOGGING("Skipping packet, rcode > 5.");
             return;     // question count other than 1 in DNS packet is very weird
         }
 
         // Answer count, other counts are useless for us
         this->answerCount = ntohs(*(uint16_t*)(this->packet + this->position + 6));
+        LOGGING("Answers count: " << (int)this->answerCount);
 
         this->position += 12;   // Set possition after header
 
