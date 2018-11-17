@@ -14,10 +14,16 @@ const string reset("\033[0m");
     cerr << message << " Terminating." << reset << endl; \
     exit(EXIT_FAILURE);
 
+// If 1 logging is active
+#define VERBOSE 0
+
 // Macro for logging data when debbuging
 #define LOGGING(message) \
-    cerr << yellow << "LOG: " <<   \
-    message << reset << endl;
+    if (VERBOSE == 1)    \
+    {                    \
+        cerr << yellow << "LOG: " <<   \
+        message << reset << endl;      \
+    }
 
 /************************************ Statics from cpp-base64 ***********************************/
 

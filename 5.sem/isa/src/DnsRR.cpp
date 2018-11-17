@@ -6,6 +6,8 @@
 
 using namespace std;
 
+#define POINTER_LIMIT 10
+
 // Holds the information for a dns resource record
 // Only used for answers in our case
 class DnsRR
@@ -20,9 +22,29 @@ class DnsRR
 
     /*********************************************** PRIVATE Methods ********************************************/
 
-    // Return domain name
+    // Overloading
     string readDomainName(uint32_t* position)
     {
+        string name = readDomainName(position, 0);
+
+        if (!name.compare(""))  // Only root byte
+        {
+            name = ".";
+        }
+        
+        return name;
+    }
+
+    // Return domain name
+    string readDomainName(uint32_t* position, uint8_t pointers)
+    {
+        // Check if limit of pointers wasn't been reached
+        // Protection against infinite loops in compressed domain name
+        if (pointers > 10)
+        {
+            return "";
+        }
+
         string domainName = "";
         
         while (this->packet[*position] != 0)
@@ -42,7 +64,7 @@ class DnsRR
                 offset = ((ch & 0b00111111) << 8) | packet[(*position) + 1]; // First two bits are offset , length is max 63
                 uint32_t tmp = this->idPosition + offset;
 
-                string label = this->readDomainName(&tmp);      // Recursion
+                string label = this->readDomainName(&tmp, pointers + 1);      // Recursion
 
                 domainName += label;
                 *position += 2;
