@@ -73,7 +73,8 @@
         V prvom prípade sa pred započatím odchytávania spustí funkcia \textbf{sendingLoop()},
         ktorá sa v separátnom vlákne stará o pravidelné odosielanie na Syslog server. Pre odoslanie volá funkcia \textbf{sendStats()}, ktorá si volá
         pomocné funkcie na vytvorenie správ ako napr.: \textbf{getMessages()} alebo \textbf{getFormattedTime()} a následne \emph{UDP} protokolom 
-        odosiela správy. Správa nie je dlhšia ako 1 kB a jednotlivé štatistiky sú oddelené znakom $\vert$.
+        odosiela správy. Je podporovaná IPv4 aj IPv6 adresa Syslog serveru. Správa nie je dlhšia ako 1 kB a jednotlivé štatistiky sú oddelené znakom $\vert$. Ak neboli odchytené žiadne validné
+        DNS pakety, odosiela sa správa s touto informáciou.
 
         V druhom prípade ak nebol zadaný Syslog server, je po prečítaní súboru zavolaná funkcia \textbf{getMessages()}, ktorá štatistiky vypíše
         na štandardný výstup a aplikácia končí. Rovnaká funkcia je volaná aj pri prijatí signálu \textbf{SIGUSR1}.
@@ -86,7 +87,9 @@
 
         \subsection{DnsPacket.cpp}
         Vo funkcii \textbf{Parse()} je najprv zavolaná funkcia \textbf{getTransProt()}. Tá parsuje \emph{ethernet} hlavičku (podporované typy sú IPv4 a IPv6)
-        a následne zistí transportný protokol (podporované typy sú UDP a TCP) a skočí na pozíciu, kde by sa mala nachádzať DNS hlavička.
+        a následne zistí transportný protokol (podporované typy sú UDP a TCP). Pri parsovaní sú využíváné štrutúry z linuxových hlavičkových súborov \textbf{netinet}.
+        Pri zistení veľkosti TCP hlavičky som sa inšpiroval vláknami z fóra stackoverflow.com\footnote{https://stackoverflow.com/questions/6639799/calculate-size-and-start-of-tcp-packet-data-excluding-header}
+        a \footnote{https://stackoverflow.com/questions/21893601/no-member-th-seq-in-struct-tcphdr-working-with-pcap} kvôli kompatibilite.
 
         Parsovanie DNS hlavičky začína vo funkcii \textbf{dnsParse()}. Tam prebehnú validácie, či ide skutočne o DNS paket. \emph{query} pakety sú
         ignorované, aplikácia pracuje len s answers. Ak sú nájdené answers, je zavolaná funkcia \textbf{parseRRSet()}, kde je hneď na začiatku zavolaná funkcia \textbf{skipQuestion()}, ktorá
@@ -133,8 +136,8 @@
 
         \subsection{Pole "hostname" v Syslog správe}
         RFC 5424\footnote{https://tools.ietf.org/html/rfc5424} špecifikuje prioritu. Aplikácia nepredpokladá existenciu FQDN ani statickú IP adresu, preto
-        sa najprv pokúsi získať hostname a až v prípade neúspechu ip adresu.:\\\\
-        \includegraphics[scale=0.6]{hostname.png}
+        sa najprv pokúsi získať hostname a až v prípade neúspechu IPv6 alebo IPv4 adresu.:\\\\
+        \includegraphics[scale=0.5]{hostname.png}
 
         \newpage
 
@@ -143,10 +146,16 @@
         codereview.stackexchange.com\footnote{https://codereview.stackexchange.com/questions/11921/getting-current-time-with-milliseconds}.:\\\\
         \includegraphics[scale=0.6]{timestamp.png}
 
+        \subsection{Logovanie}
+        Zdrojový kód obsahuje \emph{macro} na logovanie, ktoré veľmi pomáha pri debugovaní. Logovanie sa dá jednoducho zapnúť a výpnúť zmenou hodnoty
+        premennej \textbf{VERBOSE}.:\\\\
+        \includegraphics[scale=0.6]{log.png}
+
         \newpage
 
         \subsection{Vytvorenie správ na odoslanie}
-        Aplikácia vytvára správy s dĺžkou nepresahujúcou 1KB. Na Syslog server je v jednej správe posielaných viac štatistík oddelených znakom \texttt{|} .:\\\\
+        Aplikácia vytvára správy s dĺžkou nepresahujúcou 1KB. Na Syslog server je v jednej správe posielaných viac štatistík oddelených znakom \texttt{|} .
+        V prípade, že je list so štatistikami prázdny sa odošle reťazec "No DNS packets found".:\\\\
         \includegraphics[scale=0.6]{messages.png}
 
         \newpage
