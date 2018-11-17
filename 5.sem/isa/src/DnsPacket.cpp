@@ -130,10 +130,9 @@ class DnsPacket
                 // https://stackoverflow.com/questions/6639799/calculate-size-and-start-of-tcp-packet-data-excluding-header
                 // https://stackoverflow.com/questions/21893601/no-member-th-seq-in-struct-tcphdr-working-with-pcap
                 #if (defined (__FAVOR_BSD))
-                    len -= sizeof (uint32_t) * tcp->th_off;
                     this->position += tcpHeader->th_off * 4;
                 #else
-                  this->position += tcpHeader->doff * 4;
+                    this->position += tcpHeader->doff * 4;
                 #endif
 
                 // Skip length field in DNS header - this field is only in TCP packet

@@ -138,6 +138,11 @@ class DnsRR
                 this->typeStr  = "SPF";
                 this->parserTXT();
                 break;
+            case 12:
+                // PTR has exactly same fields as CNAME
+                this->typeStr  = "PTR";
+                this->parserDOMAIN_NAME();
+                break;
             /***************************** DNSSEC *****************************/
             case 48:
                 this->typeStr  = "DNSKEY";

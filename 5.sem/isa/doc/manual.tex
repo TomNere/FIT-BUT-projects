@@ -104,7 +104,8 @@
         Každá answer začína \emph{domain-name}, ktorý je získaný funkciou \textbf{readDomainName()}. Ak sa podarí získať domain-name, nasleduje získanie \emph{rr-type} a dĺžky dát.
         Vo funkcii \textbf{applyParser()} je \textbf{switch}, v ktorom sa na základe typu záznamu rozhodne ktorý z parserov\footnote{Konkrétnejší popis jednotlivých parserov je v komentároch v zdrojovom kóde. 
         Veľmi špecifický je záznam typu \texttt{SPF}. V súčasnosti sa posielajú iba záznamy typu \texttt{TXT} ktoré sa dajú na základe určitých pravidiel označiť ako \texttt{SPF}. Toto aplikácia nezisťuje
-        a každý \texttt{TXT} záznam označí typom \texttt{TXT}. Keby náhodou prišiel záznam typu \texttt{SPF}, je parsovaný rovnako ako klasický \texttt{TXT} záznam.} pre dáta použiť. Okrem toho sa typ uloží ako \emph{string}
+        a každý \texttt{TXT} záznam označí typom \texttt{TXT}. Keby náhodou prišiel záznam typu \texttt{SPF}, je parsovaný rovnako ako klasický \texttt{TXT} záznam.} pre dáta použiť. Aplikácia podporuje
+        spracovanie nasledujúcich typov DNS záznamov: \texttt{A, AAAA, CNAME, MX, NS, SOA, TXT, SPF, PTR, DNSKEY, DS, RRSIG a NSEC}. Okrem zavolania konkrétneho parsera sa typ uloží ako \emph{string}
         hodnota pre jednoduchšie ukladanie štatistík. Ak sa podarilo získať dáta, je vrátená pozícia za odpoveďou a aplikácia pokračuje parsovaním ďalšej answer.
 
         \subsection{Helpers.cpp}
@@ -122,8 +123,13 @@
         \subsection{LINUX\_SLL datalink}
         Pri odchytávaní na všetkých rozhraniach (interface=any), nemajú pakety ethernet hlavičku ale tzv. \emph{"linux-coocked header"}.
         To sa dá zistiť pomocou funkcie \textbf{pcap\_datalink()}. Ak ide o \texttt{LINUX\_SLL\_DATALINK}, hlavička je parsovaná iným spôsobom ako ethernet:\\\\
-        \includegraphics[scale=0.6]{datalink.png}\\\\
+        \includegraphics[scale=0.6]{datalink.png}\\
         \includegraphics[scale=0.6]{ethernet.png}
+
+        \subsection{Netlačiteľné znaky}
+        Ak sa v DNS answer (konkrétne v domain-name alebo v dátach \texttt{TXT} záznamu) objaví netlačiteľný znak, je vypísaný v hexadecimálnom tvare s prefixom 0x. Touto funkciou
+        je prevádzaná aj bitová mapa v \texttt{NSEC} zázname. Pre 16 bitové čísla existuje druhá verzia funkcie \textbf{ToHex}, používaná pri záznamoch typu \texttt{DNSKEY a DS}:\\\\
+        \includegraphics[scale=0.6]{tohex.png}
 
         \newpage
 

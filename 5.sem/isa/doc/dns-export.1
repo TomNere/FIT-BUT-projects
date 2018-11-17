@@ -13,7 +13,7 @@ parses packets of DNS protocol. It supports reading data from pcap file and snif
  Statistics can be regularly sent to Syslog server.\
  When sniffing interface, dns-export runs forever and statistics are sent in time interval.\
  Other way is to send SIGUSR1 signal to dns-export and statistics are printed to standart output (stdout).\
- Statistics syntax: domain-name rr-type rr-answer and count of occurrence of this combination (e.g. google.com A 172.217.23.238 68)
+ Statistics syntax: domain-name rr-type rr-answer count. Count is number of occurrence of this combination (e.g. google.com A 172.217.23.238 68)
 .SH OPTIONS
 .TP
 .BR \-r =\fIfile.pcap\fR
