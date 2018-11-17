@@ -41,6 +41,7 @@ class DnsPacket
         struct ip* myIp;
         struct ip6_hdr* myIpv6;
         uint8_t transProtType;
+        u_int sizeIp;
 
         if (this->datalink == LINUX_SLL_DATALINK)
         {
@@ -94,26 +95,37 @@ class DnsPacket
                     return false;
                 }
 
-                this->position += sizeof(struct ip);                // skip Ethernet IP header
+                sizeIp = myIp->ip_hl * 4;               // length of IP header
+                this->position += sizeIp;               // skip Ethernet IP header
+
                 transProtType = myIp->ip_p;
                 break;
             case ETHERTYPE_IPV6:
                 myIpv6 = (struct ip6_hdr*)(packet + this->position);
-                this->position += sizeof(struct ip6_hdr);           // skip Ethernet IPv6 header
+                sizeIp =  sizeof(struct ip6_hdr);
+                this->position += sizeIp;               // skip Ethernet IPv6 header
+
                 transProtType = myIpv6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
                 break;
             default:
                 return false;       // Unsupported
         }
         
+        // Only needed in TCP packet
+        struct tcphdr* tcpHeader;
+
         // Skip position according to transport protocol type
         switch (transProtType)
         {
             case UDP:
                 this->position += sizeof(struct udphdr);
                 break;
-            case TCP: 
-                this->position += sizeof(struct tcphdr);
+            case TCP:
+                tcpHeader = (struct tcphdr*)(packet + this->position);   // Get TCP header
+                this->position += tcpHeader->th_off * 4;                                // Skip TCP header
+
+                // Skip length field in DNS header - this field is only in TCP packet
+                this->position += 2;
                 break;
             default:
                 return false;       // Unsupported
@@ -192,7 +204,7 @@ class DnsPacket
     void parseRRSet()
     {
         // Skip question section because we don't need it's data
-        this->SkipQuestion();
+        this->skipQuestion();
 
         // Parse answers
         for (int i = 0; i < this->answerCount; i++)
@@ -216,7 +228,7 @@ class DnsPacket
     }
 
     // Skip Question section
-    void SkipQuestion()
+    void skipQuestion()
     {
         //  Question section contains the following fields:
         //                                    1  1  1  1  1  1

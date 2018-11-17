@@ -513,7 +513,7 @@ class DnsRR
             this->domainName = this->readDomainName(&(this->position));
     
             // Unable to get domain name - error
-            if (this->domainName.empty())
+            if (!(this->domainName.compare("")))
             {
                 return 0;
             }

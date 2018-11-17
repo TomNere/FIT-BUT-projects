@@ -44,7 +44,7 @@ const string help = "Invalid parameters!\n\n"
                     "seconds - time period of interface sniffing\n";
 
 #define SYSLOG_PORT 514
-#define MESSAGE_SIZE 900
+#define MESSAGE_SIZE 400
 
 // to_ms parameter for pcap_open_live, same value is used by wireshark
 #define TO_MS 100
@@ -123,18 +123,18 @@ class DnsExport
         list<DnsRecord>::iterator it; 
 
         // Create copy (safer multithreading)
-        list<DnsRecord listToWrite = recordList
+        list<DnsRecord> listToWrite = recordList;
 
         for(it = listToWrite.begin(); it != listToWrite.end(); it++) 
         {
-            cout << it->GetSimpleString() << endl;
+            cout << it->GetString() << endl;
         }
     }
 
     // Interface sniffer
     void sniffInterface()
     {
-        // Open device for sniffing 100 ms is value used by wireshark
+        // Open device for sniffing TO_MS = 100 ms is value used by wireshark
         if ((myPcap = pcap_open_live(parameters.interface.c_str(), BUFSIZ, true, TO_MS, this->errBuf)) == NULL)
         {
             ERR_RET("Unable to open interface for listening. Error: " << errBuf);
@@ -251,6 +251,22 @@ class DnsExport
         }
     }
 
+    // Thread sending stats to syslog server
+    static void* sendingLoop(void* time)
+    {
+        // Initial sleep - waiting for pcap to start and parse something
+        chrono::milliseconds openLiveTO(20); // By given parameter
+        this_thread::sleep_for(openLiveTO);
+
+        // http://www.cplusplus.com/forum/beginner/91449/
+        chrono::seconds interval(*((int*)time)); // By given parameter
+        while (true)
+        {
+            this_thread::sleep_for(interval);
+            sendStats();
+        }
+    }
+
     // Send stats to syslog server (over UDP)
     static void sendStats()
     {
@@ -300,8 +316,9 @@ class DnsExport
 
         for (it = messages.begin(); it != messages.end(); it++)
         {
+            LOGGING(*it);
             // Send packet
-            if (sendto(sock, it->c_str(), BUFSIZ, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
+            if (sendto(sock, it->c_str(), it->length() + 1, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // + 1 for '\0' character 
             {
                 ERR_RET("Syslog - sendto error!");
             }
@@ -320,7 +337,7 @@ class DnsExport
         list<DnsRecord>::iterator it;
 
         // Create copy (safer multithreading)
-        list<DnsRecord listTosend = recordList;
+        list<DnsRecord> listTosend = recordList;
 
         for (it = listTosend.begin(); it != listTosend.end(); it++)
         {
@@ -329,22 +346,27 @@ class DnsExport
             // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
             {
-                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + message;
+                message.erase(0, 3);
+                message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
                 messages.push_back(message);
                 message = "";
             }
+
+            record = " | " + record;
             message += record;
         }
+        
+        message.erase(0, 3);
 
         // At the end add last message to the list
-        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + message;
+        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
         messages.push_back(message);
 
         return messages;
     }
 
     // Returns the local date/time formatted as 2014-03-19 11:11:52
-    // https://stackoverflow.com/questions/7411301/how-to-introduce-date-and-time-in-log-file
+    // https://codereview.stackexchange.com/questions/11921/getting-current-time-with-milliseconds
     static string getFormattedTime()
     {
         timeval curTime;
@@ -358,22 +380,6 @@ class DnsExport
         sprintf(currentTime, "%s.%03dZ", buffer, milli);
 
         return currentTime;
-    }
-
-    // Thread sending stats to syslog server
-    static void* sendingLoop(void* time)
-    {
-        // Initial sleep - waiting for pcap to start and parse something
-        chrono::miliseconds openLiveTO(TO_MS); // By given parameter
-        this_thread::sleep_for(openLiveTO + 10);
-
-        // http://www.cplusplus.com/forum/beginner/91449/
-        chrono::seconds interval(*((int*)time)); // By given parameter
-        while (true)
-        {
-            this_thread::sleep_for(interval);
-            sendStats();
-        }
     }
 
     /*********************************************** PUBLIC Methods ********************************************/

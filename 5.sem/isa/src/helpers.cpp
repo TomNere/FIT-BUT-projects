@@ -21,14 +21,9 @@ const string reset("\033[0m");
 
 /************************************ Statics from cpp-base64 ***********************************/
 
-static const string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+static const string base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                    "abcdefghijklmnopqrstuvwxyz"
                                    "0123456789+/";
-
-static inline bool is_base64(unsigned char c)
-{
-  return (isalnum(c) || (c == '+') || (c == '/'));
-}
 
 // Only static helper methods
 class Helpers
@@ -66,7 +61,7 @@ class Helpers
                     charArray4[3] = charArray3[2] & 0x3f;
 
                     for(i = 0; (i <4) ; i++)
-                      ret += base64_chars[charArray4[i]];
+                      ret += base64Chars[charArray4[i]];
                     i = 0;
                 }
             }
@@ -84,7 +79,7 @@ class Helpers
 
                 for (j = 0; (j < i + 1); j++)
                 {
-                    ret += base64_chars[charArray4[j]];
+                    ret += base64Chars[charArray4[j]];
                 }
 
                 while((i++ < 3))
