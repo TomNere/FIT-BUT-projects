@@ -15,7 +15,7 @@ const string reset("\033[0m");
     exit(EXIT_FAILURE);
 
 // If 1 logging is active
-#define VERBOSE 0
+#define VERBOSE 1
 
 // Macro for logging data when debbuging
 #define LOGGING(message) \
@@ -39,8 +39,16 @@ class Helpers
         static string ToHex(uint8_t ch)
         {
             stringstream ss;
-            ss << "0x" << setfill('0') << setw(2) << hex << ch;
+            ss << "0x" << setfill('0') << setw(2) << hex << (int)ch;
             return ss.str(); 
+        }
+
+        // Symbolize uint16_t as integer
+        static string ToHex(uint16_t ch)
+        {
+            stringstream ss;
+            ss << "0x" << setfill('0') << setw(4) << hex << (int)ch;
+            return ss.str();
         }
 
         // Encode byte array as base64
@@ -55,7 +63,6 @@ class Helpers
             int j = 0;
             unsigned char charArray3[3];
             unsigned char charArray4[4];
-
             while (inLen--)
             {
                 charArray3[i++] = *(bytesToEncode++);

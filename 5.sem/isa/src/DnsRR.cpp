@@ -303,6 +303,7 @@ class DnsRR
     {
         for (int i = 0; i < this->rdLength; i++)
         {
+            this->data += " ";
             this->data += '"';
 
             // length octet
@@ -322,14 +323,11 @@ class DnsRR
                 }
             }
             this->data += '"';
-            this->data += " ";
             i += length;
         }
 
-        if (this->data.size() > 0)
-        {
-            this->data = this->data.substr(0, this->data.size()-1);   // Remove last " "
-        }
+        // Remove leading " "
+        this->data.erase(0,1);  
     }
 
     /********************************************** DNSSEC *****************************************/
@@ -366,7 +364,7 @@ class DnsRR
         string publicKey = Helpers::Base64Encode(packet + this->position + 4, this->rdLength - 4);
 
         stringstream ss;
-        ss << '"' << flags << " " << protocol << " " << algorithm << " " << publicKey << '"';
+        ss << '"' << Helpers::ToHex(flags) << " " << (int)protocol << " " << (int)algorithm << " " << publicKey << '"';
         this->data = ss.str();
     }
 
@@ -401,7 +399,7 @@ class DnsRR
         string digest = Helpers::Base64Encode(packet + this->position + 4, this->rdLength - 4);
 
         stringstream ss;
-        ss << '"' << keyTag << " " << algorithm << " " << digestType<< " " << digest << '"';
+        ss << '"' << Helpers::ToHex(keyTag) << " " << (int)algorithm << " " << (int)digestType<< " " << digest << '"';
         this->data = ss.str();
     }
 
@@ -476,13 +474,15 @@ class DnsRR
         // We will symbolize as hex numbers
 
         string bitmap;
-        for (int i = position; i < this->rdLength - (position - this->position); i++)
+
+        for (int i = 0; i < this->position + rdLength - position; i++)
         {
-            uint8_t ch = this->packet[i];
-            bitmap += Helpers::ToHex(ch);
             bitmap += " ";
+            uint8_t ch = this->packet[position + i];
+            bitmap += Helpers::ToHex(ch);
         }
 
+        bitmap.erase(0, 1);
         stringstream ss;
         ss << '"' << domain << " " << bitmap << '"';
         this->data = ss.str();
