@@ -8,6 +8,7 @@
 #include <netdb.h>      // gethostbyname...
 #include <thread>       // Sending loop
 #include <arpa/inet.h>  // inet_pton
+#include <algorithm>    // check IPv6
 
 #include "DnsPacket.cpp"
 #include "DnsRecord.cpp"
@@ -37,12 +38,14 @@ rawParameters parameters;
 
 /*************************************************** CONSTS ******************************************************/
 
-const string help = "Invalid parameters!\n\n"
-                    "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n"
-                    "file.pcap - file to sniff\n"
-                    "interface - interface to sniff (or ANY for all interfaces)\n"
-                    "syslog-server - syslog server where the stats are sent\n"
-                    "seconds - time period of interface sniffing\n";
+const string usage = "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog-server] [-t seconds] \n"
+                     "file.pcap - file to sniff\n"
+                     "interface - interface to sniff (or ANY for all interfaces)\n"
+                     "syslog-server - Syslog server where the stats are sent\n"
+                     "seconds - time period of sending stat to Syslog server\n";
+
+const string help = "Invalid parameters!\n" + usage;
+                    
 
 #define SYSLOG_PORT 514
 #define MESSAGE_SIZE 400
@@ -66,7 +69,7 @@ class DnsExport
     {
         int option;
 
-        while ((option = getopt(argc, (char **)argv, "r:i:s:t:")) != -1)
+        while ((option = getopt(argc, (char **)argv, "r:i:s:t:h")) != -1)
         {
             switch (option)
             {
@@ -98,6 +101,9 @@ class DnsExport
                     }
                     parameters.time = string(optarg);
                     break;
+                case 'h':
+                    cout << usage;
+                    exit(EXIT_SUCCESS);
                 default:
                     ERR_RET(help);
             }
@@ -281,7 +287,7 @@ class DnsExport
         bool ipv6 = false;
 
         // Check if IPv6 address
-        if (parameters.syslogServer.find_first_of(":") != string::npos)
+        if (count(parameters.syslogServer.begin(), parameters.syslogServer.end(), ':') > 1)
         {
             ipv6 = true;
 
@@ -324,32 +330,6 @@ class DnsExport
         if (!gethostname(tmp, sizeof tmp))
         {
             hostname = tmp;
-        }
-        else
-        {
-            // Return value != signalize error. Try to get ip address
-            if (ipv6)
-            {
-                struct sockaddr_in6 ipAddress;
-                socklen_t length = sizeof(ipAddress);
-                char hostnameChar[INET_ADDRSTRLEN];
-
-                if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
-                {
-                    inet_ntop(AF_INET6, ipAddress.sin6_addr.s6_addr, hostnameChar, length);
-                    hostname = hostnameChar;
-                }
-            }
-            else
-            {
-                struct sockaddr_in ipAddress;
-                socklen_t length = sizeof(ipAddress);
-
-                if (!getsockname(sock, (struct sockaddr*)&ipAddress, &length))
-                {
-                    hostname = ipAddress.sin_addr.s_addr;
-                }
-            }
         }
 
         // Get and send all mesagges
@@ -428,7 +408,7 @@ class DnsExport
         int milli = curTime.tv_usec / 1000;
 
         char buffer [80];
-        strftime(buffer, 80, "%Y-%m-%dT%H:%M:%S", localtime(&curTime.tv_sec));
+        strftime(buffer, 80, "%Y-%m-%dT%H:%M:%S", gmtime(&curTime.tv_sec));
 
         char currentTime[84] = "";
         sprintf(currentTime, "%s.%03dZ", buffer, milli);
