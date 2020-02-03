@@ -1,5 +1,5 @@
 # FIT BUT projects
-________________________________________________
+
 This repository contains some school projects which I created throughout my Bachelor's degree at FIT BUT 2016-2019. It should help IT students to understand principles, serve as inspiration, etc.
 
 ## 1 BIT
