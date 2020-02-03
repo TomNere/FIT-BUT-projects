@@ -1,0 +1,287 @@
+#!/bin/sh
+
+POSIXLY_CORRECT=yes
+IFS='
+'
+normalization=0
+regex=0
+file_ere=""
+dir="."
+
+if [ -t 1 ]; then
+    width=$(tput cols)
+    width=$((width-13))
+    width2=$(tput cols)
+    width2=$((width2-48))
+else
+    width=67
+    width2=32
+fi
+
+while getopts :ni: opt
+do
+    case $opt in
+    n) if [ $normalization -eq 1 ]; then
+        echo "illegal option" >&2
+        exit 1
+        fi
+        normalization=1;;
+    i) if [ $regex -eq 1 ]; then
+        echo "illegal option" >&2
+        exit 1
+        fi 
+        regex=1
+        file_ere="$OPTARG";;
+    *) echo "illegal option" >&2
+    exit 1;;
+    esac
+done
+
+OPTIND=$((OPTIND-1))
+
+if [ $OPTIND -ne $# ]; then
+    if [ $((OPTIND+1)) -eq $# ]; then
+    shift $OPTIND
+    dir="$*"
+    else
+    echo "illegal option" >&2
+    exit 1 
+    fi
+fi
+
+if [ "$(find $dir)" = "" ]; then 
+    echo "Directory not found" >&2
+    exit 1
+fi
+
+root_dir_test=$(readlink -f $dir)
+
+if [ $regex -eq 1 ]; then
+    problem=$(echo $root_dir_test | egrep "$file_ere")
+
+    if [ "$problem" != "" ]; then
+        error="rd_error"
+    else
+        error=$( echo "$root_dir_test" | tr "/" "\n" | while read line; do
+            problem=$(echo "$line" | egrep "$file_ere") 
+            if [ "$problem" != "" ]; then
+                echo "rd_error"
+                break  
+            fi
+        done )
+    fi
+
+    if [ "$error" = "rd_error" ]; then 
+    echo "Regular expresion covers root directory!" >&2
+    exit 1
+    fi   
+fi
+
+directories=0
+files=0
+
+echo "Root directory: "$dir 
+
+for d in $(find $root_dir_test -type d)
+do
+    if [ $regex -eq 1 ]; then
+        problem=$(echo "$d" | egrep "$file_ere")
+        if [ "$problem" != "" ]; then
+            continue
+        fi
+
+        error=$( echo "$d" | tr "/" "\n" | while read line; do
+            problem=$(echo "$line" | egrep "$file_ere")
+            if [ "$problem" != "" ]; then
+                echo "ignore"
+                break  
+            fi
+        done )
+
+        if [ "$error" = "ignore" ]; then
+            continue
+        fi    
+    fi
+    directories=$((directories+1))
+done
+
+size_0=0
+size_1=0
+size_2=0
+size_3=0
+size_4=0
+size_5=0
+size_6=0
+size_7=0
+size_8=0
+
+for f in $(find $root_dir_test -type f);
+do
+    if ! [ -r "$f" ]; then
+        continue
+    fi 
+
+    if [ -L "$f" ]; then
+        continue
+    fi
+
+    if [ $regex -eq 1 ]; then
+        problem=$(echo "$f" | egrep "$file_ere")
+        if [ "$problem" != "" ]; then
+            continue
+        fi
+
+        error=$( echo "$f" | tr "/" "\n" | while read line; do
+            problem=$(echo "$line" | egrep "$file_ere")
+            if [ "$problem" != "" ]; then
+                echo "ignore"
+                break  
+            fi
+        done )
+        
+        if [ "$error" = "ignore" ]; then
+            continue
+        fi
+    fi
+
+    files=$((files+1))
+    velkost="$(wc -c <"$f")"
+
+    if [ $velkost -lt 100 ]; then    
+        size_0=$((size_0+1))
+    elif [ $velkost -lt 1024 ]; then
+            size_1=$((size_1+1))
+    elif [ $velkost -lt 10240 ]; then
+            size_2=$((size_2+1))
+    elif [ $velkost -lt 102400 ]; then
+            size_3=$((size_3+1))
+    elif [ $velkost -lt 1048576 ]; then
+            size_4=$((size_4+1))
+    elif [ $velkost -lt 10485760 ]; then
+            size_5=$((size_5+1))
+    elif [ $velkost -lt 104857600 ]; then
+            size_6=$((size_6+1))
+    elif [ $velkost -lt 1073741824 ]; then
+            size_7=$((size_7+1))
+    else 
+            size_8=$((size_8+1))
+    fi
+done
+
+echo Directories: $directories
+echo All files: $files
+echo File size histogram:
+
+if [ $normalization -eq 1 ]; then
+    count=0
+    i=0
+    while [ $i -lt 9 ]; do
+        if [ $count -lt $((size_$i)) ]; then
+            count=$((size_$i))
+        fi
+        i=$((i+1))
+    done
+    
+    if [ $count -ne 0 ] && [ $count -gt $width ]; then
+        max=$(($count-$(($count-$width))))
+        
+        size_0=$(($(($size_0*$max))/$count))
+        size_1=$(($(($size_1*$max))/$count))
+        size_2=$(($(($size_2*$max))/$count))
+        size_3=$(($(($size_3*$max))/$count))
+        size_4=$(($(($size_4*$max))/$count))
+        size_5=$(($(($size_5*$max))/$count))
+        size_6=$(($(($size_6*$max))/$count))
+        size_7=$(($(($size_7*$max))/$count))
+        size_8=$(($(($size_8*$max))/$count))   
+    fi
+fi
+
+PrintSharp ()
+{
+    i=0
+    while [ $i -lt $1 ]; do
+        printf "#"
+        i=$((i+1))
+    done
+    echo 
+}
+
+printf "  <100 B  : "
+PrintSharp $size_0
+printf "  <1 KiB  : "
+PrintSharp $size_1
+printf "  <10 KiB : "
+PrintSharp $size_2
+printf "  <100 KiB: "
+PrintSharp $size_3
+printf "  <1 MiB  : "
+PrintSharp $size_4
+printf "  <10 MiB : "
+PrintSharp $size_5
+printf "  <100 MiB: "
+PrintSharp $size_6
+printf "  <1 GiB  : "
+PrintSharp $size_7
+printf "  >=1 GiB : "
+PrintSharp $size_8
+
+echo "File type histogram:"
+
+count=0
+
+for f in $(find $root_dir_test -type f); do 
+
+    if ! [ -r "$f" ]; then
+        continue
+    fi 
+
+    if [ -L "$f" ]; then
+        continue
+    fi
+
+    if [ $regex -eq 1 ]; then
+        problem=$(echo "$f" | egrep "$file_ere")
+        if [ "$problem" != "" ]; then
+            continue
+        fi
+
+        error=$( echo "$f" | tr "/" "\n" | while read line; do
+        problem=$(echo "$line" | egrep -E "$file_ere")
+        if [ "$problem" != "" ]; then
+            echo "ignore"
+            break  
+        fi
+        done )
+
+        if [ "$error" = "ignore" ]; then
+            continue
+        fi
+    fi
+
+    type=$(file -b $f)
+    if [ ${#type} -gt 40 ]; then
+        printf "@  $(file -b $f | cut -c1,1-40)...: \n"
+    else
+        printf "@  %-43s: \n" "$type"
+    fi
+    done | sort | uniq -c | sort -gr | head -10 | while read line; do   
+
+    occurrence=$(printf "$line" | cut -d'@' -f1) 
+    printf "$line" | cut -d"@" -f2 | tr -d "\n"
+
+    if [ $normalization -eq 1 ]; then        
+        if [ $count -eq 0 ]; then    
+            count=$occurrence
+        fi
+
+        if [ $count -gt $width2 ]; then
+            max=$(($count-$(($count-$width2))))
+            occurrence=$(($(($occurrence*$max))/$count))
+        fi   
+    fi
+
+    PrintSharp $occurrence
+done 
+
+exit 0 
