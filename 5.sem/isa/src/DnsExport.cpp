@@ -42,7 +42,7 @@ const string usage = "Usage: dns-export [-r file.pcap] [-i interface] [-s syslog
                      "file.pcap - file to sniff\n"
                      "interface - interface to sniff (or ANY for all interfaces)\n"
                      "syslog-server - Syslog server where the stats are sent\n"
-                     "seconds - time period of sending stat to Syslog server\n";
+                     "seconds - time period of sending stats to Syslog server\n";
 
 const string help = "Invalid parameters!\n" + usage;
                     
@@ -363,14 +363,13 @@ class DnsExport
     {
         list<string> messages;
         string message;
-        
         list<DnsRecord>::iterator it;
         list<DnsRecord> listTosend = recordList;    // Create copy (safer multithreading)
 
         // Create list of all messages
         for (it = listTosend.begin(); it != listTosend.end(); it++)
         {
-            string record = it->GetString();
+            string record =  " | " + it->GetString();
 
             // We can add another record to one message if limit wasn't exceeded
             if ((record + message).size() > MESSAGE_SIZE)
@@ -380,22 +379,21 @@ class DnsExport
                 messages.push_back(message);
                 message = "";
             }
-
-            record = " | " + record;
             message += record;
         }
 
-        message.erase(0, 3);    // Remove leading |
-        
-        if (messages.size() == 0 && !message.compare(""))
+        // At the end add last message to the list if not ""
+        if (message.compare(""))
+        {
+            message.erase(0, 3);        // Remove leading |
+            message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
+            messages.push_back(message);
+        }
+        else if (messages.size() == 0)
         {
             message = "No DNS packets found";
+            messages.push_back(message);
         }
-
-        // At the end add last message to the list
-        message = "<134>1 " + getFormattedTime() + " " + hostname + " dns-export" + " - - - " + message;
-        messages.push_back(message);
-
         return messages;
     }
 
@@ -452,5 +450,5 @@ class DnsExport
             }
             
             return 0;
-        }   
+        }
 };

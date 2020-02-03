@@ -1,10 +1,10 @@
-#include "DnsRR.cpp"
-
 #include <netinet/ip.h>         // ip struct
 #include <netinet/ip6.h>        // ip6_hdr struct
 #include <netinet/udp.h>        // udphrd
 #include <netinet/tcp.h>        // tcphdr
 #include <netinet/if_ether.h>   // ETHERTYPE_IP...
+
+#include "DnsRR.cpp"
 
 using namespace std;
 
@@ -14,6 +14,7 @@ using namespace std;
 #define TCP 0x06
 #define ETHERNET_DATALINK 1
 #define LINUX_SLL_DATALINK 113
+#define FRAGMENTED 1500
 
 // For creating fake ethernet header
 const unsigned char rawheader[14] = {0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x81, 0x00};
@@ -67,13 +68,13 @@ class DnsPacket
             //  .                           .
             //  .                           .
 
-            ethType = ntohs(*(uint16_t*)(packet + 14));
+            ethType = ntohs(*(uint16_t*)(this->packet + 14));
             this->position += 16;
         }
         else if (this->datalink == ETHERNET_DATALINK)
         {
             // Read the ethernet header
-            eptr = (struct ether_header*)packet;
+            eptr = (struct ether_header*)this->packet;
             ethType = ntohs(eptr->ether_type);
             this->position += sizeof(struct ether_header);
         }
@@ -88,7 +89,7 @@ class DnsPacket
         {
             // see /usr/include/net/ethernet.h for types (ip, ip6_header...)
             case ETHERTYPE_IP:
-                myIp = (struct ip*)(packet + this->position);
+                myIp = (struct ip*)(this->packet + this->position);
 
                 // Check for fragmentation
                 if (myIp->ip_off & IP_OFFMASK > 0 || myIp->ip_off & IP_MF  == 0b1)
@@ -103,7 +104,7 @@ class DnsPacket
                 transProtType = myIp->ip_p;
                 break;
             case ETHERTYPE_IPV6:
-                myIpv6 = (struct ip6_hdr*)(packet + this->position);
+                myIpv6 = (struct ip6_hdr*)(this->packet + this->position);
                 sizeIp =  sizeof(struct ip6_hdr);
                 this->position += sizeIp;               // skip Ethernet IPv6 header
 
@@ -116,6 +117,7 @@ class DnsPacket
         
         // Only needed in TCP packet
         struct tcphdr* tcpHeader;
+        uint16_t dnsSize;
 
         // Skip position according to transport protocol type
         switch (transProtType)
@@ -124,7 +126,7 @@ class DnsPacket
                 this->position += sizeof(struct udphdr);
                 break;
             case TCP:
-                tcpHeader = (struct tcphdr*)(packet + this->position);   // Get TCP header
+                tcpHeader = (struct tcphdr*)(this->packet + this->position);   // Get TCP header
 
                 // Skip TCP header
                 // https://stackoverflow.com/questions/6639799/calculate-size-and-start-of-tcp-packet-data-excluding-header
@@ -134,6 +136,14 @@ class DnsPacket
                 #else
                     this->position += tcpHeader->doff * 4;
                 #endif
+
+                // Check if TCP payload is bigger than 1500 bytes (signalizes fragmentation)
+                dnsSize = ntohs(*(uint16_t*)(this->packet + this->position));
+                if ((uint32_t)dnsSize + this->position > FRAGMENTED)
+                {
+                    LOGGING("Fragmented packet");
+                    return false;
+                }
 
                 // Skip length field in DNS header - this field is only in TCP packet
                 this->position += 2;
@@ -192,7 +202,7 @@ class DnsPacket
         
         // Check rcode for errors
         // need & because rcode has size 4 bits
-        uint8_t rcode = packet[this->position + 3] & 0b00001111;
+        uint8_t rcode = this->packet[this->position + 3] & 0b00001111;
         if (rcode > 5)
         {
             LOGGING("Skipping packet, rcode = " << hex << (int)rcode);

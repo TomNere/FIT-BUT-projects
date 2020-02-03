@@ -1,4 +1,3 @@
-#include <string>       // Strings
 #include <iomanip>      // setfill...
 
 using namespace std;
@@ -14,8 +13,8 @@ const string reset("\033[0m");
     cerr << message << " Terminating." << reset << endl; \
     exit(EXIT_FAILURE);
 
-// If 1 logging is active
-#define VERBOSE 1
+
+#define VERBOSE 0       // If 1 logging is active
 
 // Macro for logging data when debbuging
 #define LOGGING(message) \
@@ -28,8 +27,8 @@ const string reset("\033[0m");
 /************************************ Statics from cpp-base64 ***********************************/
 
 static const string base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                   "abcdefghijklmnopqrstuvwxyz"
-                                   "0123456789+/";
+                                  "abcdefghijklmnopqrstuvwxyz"
+                                  "0123456789+/";
 
 // Only static helper methods
 class Helpers
@@ -74,7 +73,9 @@ class Helpers
                     charArray4[3] = charArray3[2] & 0x3f;
 
                     for(i = 0; (i <4) ; i++)
-                      ret += base64Chars[charArray4[i]];
+                    {
+                        ret += base64Chars[charArray4[i]];
+                    }
                     i = 0;
                 }
             }

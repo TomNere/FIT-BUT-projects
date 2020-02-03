@@ -1,7 +1,5 @@
-#include <stdint.h> // Getopt
-#include <pcap.h>   // No comment needed...
-#include <string>
-#include <sstream>      // std::stringstream
+#include <sstream>  // std::stringstream
+
 #include "Helpers.cpp"
 
 using namespace std;
