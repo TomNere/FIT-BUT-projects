@@ -1,0 +1,337 @@
+/*------------------------------------------General page setings---------------------------------------*/
+body{
+    width: 100%;
+    min-width: 650px;
+    overflow-x: auto; 
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    color: #585858;
+}
+div#page{
+    position: relative;
+    width: 100%;
+    min-width: 650px;
+    max-width: 1920px;
+    margin-left: auto;
+    margin-right: auto;
+    overflow-x: hidden; 
+}
+body#itw_p1_2017{
+    background-image: url("./images/topfoto.jpg");
+    background-repeat: no-repeat;
+    background-position-x: center;
+    margin-left:auto; 
+    margin-right:auto;
+}
+div.content{
+    width: 100%;
+    max-width: 1300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+a:hover{
+    text-decoration: underline;
+}
+
+a{
+    text-decoration: none;
+    color: #585858;
+}
+h2{
+    text-align: center;
+    font-family: 'Times New Roman', Times, serif;
+    font-style: italic;
+    font-size: 35pt;
+}
+.col{
+    float: left;
+    width: 420px;
+    padding-right: 5px;
+}
+/*-------------------------------------------------HEAD---------------------------------------------------*/
+#head div.content{
+    position: relative;
+    margin-top: 20px;
+    height: 100px;  
+    background-color: rgba(1, 1, 1, 0.6);  /*tmavsie sa mi paci*/
+}
+h1#hh1 a{
+    position: absolute;
+    background-image: url("./images/logo.png");
+    background-repeat: no-repeat;
+    width: 151px;
+    height: 60px;
+    top: 20px;
+    left: 20px;
+    text-indent: -98765px;
+}
+p.hidden{
+    visibility: hidden;
+}
+nav#menu div.inside{
+    position: absolute;
+    right: 15px;
+    top: 30px; 
+    float: right;
+    padding-left: 100px;
+}
+nav#menu div.inside ul.main a{
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12pt;
+}
+ul.main{
+    float: right; 
+}
+div#lang{
+    margin-left: 20px;
+    margin-top: 16px;
+    margin-right: 5px;
+    float: left;
+}
+div#lang ul{
+    position: absolute; 
+    list-style: none;
+    top: 0px;
+    width: 15px;
+    height: 25px;
+    right: 4px;
+    text-indent: -98765px;
+}
+div#lang:hover ul{
+    background-color: rgba(255, 255, 255, 1);
+    text-indent: -30px;
+    width: 25px;
+    height: 107px;
+    right: -6px;
+    top: 20px;
+    padding-top: 5px;
+}
+ul.main{
+    float: left;
+}
+ul.main li{
+    display : inline; 
+    padding: 20px; 
+}
+span#curlang{
+    background-image: url("./images/select.png");
+    background-position: right bottom;
+    background-repeat: no-repeat;
+    padding-right : 20pt;
+    color:white; /*pretoze na tmavsom pozadi cierna nieje dobre vidiet*/
+}
+div#top{
+    height: 275px;
+}
+div#ccontainer{
+    text-align: center;
+    height: 400px;
+    margin-left: auto;
+    margin-right: auto;   
+}
+div#ccontainer a{
+    font-family: 'Times New Roman', Times, serif;
+    color: white;
+    font-style: oblique;
+    font-size: 50pt;
+}
+div#ccontainer a strong{
+    color: orange;
+}
+/*----------------------------------------------------Geology-----------------------------------------------*/
+section#intro div.cols{
+    color: #585858;
+    padding-left: 1em;
+    padding-right: 1em; 
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1300px;    
+    overflow: hidden;
+    font-weight: 300;
+    font-size: 10pt;
+}
+/*-------------------------------------------------------FULL----------------------------------------------------*/
+section#intro .full{
+    color: #585858;
+    position: relative;
+    border-bottom-style: solid;
+    border-bottom-color: #585858;
+    border-top-style: solid;
+    border-top-color: #585858;
+    border-width: 3px;
+}
+section#intro div.full p{
+    position: relative;
+    width: 60%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center; 
+}
+section#intro div.more{
+    position: absolute;
+    top: 40%;   
+    right: 0px;
+}
+section#intro div.more a{
+    background-image: url("./images/plus.png");
+    background-repeat: no-repeat;
+    background-position-x: 90%;
+    background-position-y: 50%;
+    color: #585858;
+    font-size: 12pt;
+    font-weight: bold;
+}
+section#intro div.more a span{
+    margin-right: 30px;
+}
+/*------------------------------------------------------------------Gallery----------------------------------------------------------------*/
+section#gallery div.content{
+    position: relative;
+    padding-left: 1em;
+    padding-right: 1em; 
+    overflow: hidden;
+}
+div#topgal{
+    position: relative;
+}
+div#topgal a{
+    position: relative;
+}
+span.descr em{
+    position: absolute;
+    font-size: 30pt;
+    top: 0px;
+    left: 0px;
+    width: 428px;
+    height: 296px;   
+    text-indent: -98765px;  
+}
+span.descr em:hover{
+    line-height: 230px;
+    text-indent: 0px;
+}
+span.descr{
+    position: absolute;   
+    color: #585858; 
+    top: -282px;
+    left: 0px;
+    text-indent: -98765px;
+    width: 428px;
+    height: 297px;
+    font-size: 13pt;
+}
+span.descr:hover{
+    background-color: rgba(255, 255, 255, 0.6);
+    text-indent: 0px;
+    text-align: center; 
+    line-height: 310px; 
+}
+/*-----------------------------------------------------------------------Nature--------------------------------------------------------------*/
+section#nature{
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+    background-color: #F0F0F0;
+    padding-bottom: 50px;
+}
+section#nature div.cols{
+    padding-left: 1em;
+    padding-right: 5em; 
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1300px;    
+    overflow: hidden;  
+}
+/*------------------------------------------CONTACT------------------------------------------*/
+section#contact{
+    position: relative;
+    overflow: hidden;
+    background-color: #555555;
+}
+
+section#contact div.content{ 
+    max-width: 1920px;    
+    height: 600px;    
+}
+section#contact div.full{
+    border-color: white;
+    border-width: 1px;
+    width: 100%;
+    max-width: 1300px;   
+    border-top-style: solid;
+    height: 100%;
+    max-height: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+section#contact{
+    color: white;
+    font-size: 11pt;
+}
+section#contact h2{
+    color: white;
+}
+section#contact strong{
+    color: orange;
+    font-size: 11pt;
+}
+section#contact a{
+    text-decoration: none;
+    color: white;
+}
+section#contact div.content div:last-child{
+    border-bottom-style: solid;
+    height: 100%;
+    max-height: 100px;
+}
+section#contact div.full h3{
+    display: flex;
+    float: left;
+    min-width: 30%;
+    height: 100%;
+    max-height: 250px;
+}
+section#contact div.full p{
+    width: 45%;
+    float: right;
+}
+section#contact div.full p:nth-child(even){
+    float: left;
+    width: 25%;
+    padding-right: initial;
+}
+/*---------------------------------------------------------FOOTER-----------------------------------------*/
+footer#foot div.content{
+    overflow: hidden;
+    height: 80px;  
+}
+footer span, footer a{
+    font-weight: 100;
+    color: #585858;
+    font-size: 10pt;
+}
+footer span:first-child{
+    float: left;
+    margin-left: 1em;
+    margin-top: 3em;
+}
+footer span:last-child{  
+    float: right;
+    margin-right: 1em;
+    margin-top: 3em;
+}
+a.up{
+    background-image: url("./images/up.png");
+    background-repeat: no-repeat;
+    position: absolute;
+    width: 26px;
+    height: 30px;
+    left: 49%;
+    bottom: 10px;
+    color: white;
+    text-indent: -98765px;
+}
+/*----------------------------------------------------------END-----------------------------------------------*/
